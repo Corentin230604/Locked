@@ -43,6 +43,7 @@ export type ViolationType =
   | "focus_returned"
   | "excluded"
   | "screenshot"
+  | "ai_flag"
   | "joined"
   | "disconnected";
 

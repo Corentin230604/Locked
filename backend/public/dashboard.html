@@ -19,6 +19,7 @@
   .event .type-focus_lost, .event .type-excluded { color: #f87171; }
   .event .type-focus_returned, .event .type-joined { color: #4ade80; }
   .event .type-screenshot { color: #93c5fd; }
+  .event .type-ai_flag { color: #fbbf24; font-weight: 600; }
   #events { max-height: 70vh; overflow-y: auto; }
 </style>
 </head>
@@ -67,7 +68,8 @@
   function logEvent(e) {
     const div = document.createElement("div");
     div.className = "event";
-    div.innerHTML = `<span class="type-${e.type}">[${e.type}]</span> ${e.studentName ?? ""} — ${new Date(e.timestamp).toLocaleTimeString()}`;
+    const reason = e.type === "ai_flag" && e.payload?.reason ? ` — ${e.payload.reason}` : "";
+    div.innerHTML = `<span class="type-${e.type}">[${e.type}]</span> ${e.studentName ?? ""} — ${new Date(e.timestamp).toLocaleTimeString()}${reason}`;
     eventsEl.prepend(div);
   }
 

@@ -67,14 +67,24 @@ Excel se lance en plein écran ; sortir de la fenêtre affiche l'overlay rouge a
   ne le délivre à aucun hook utilisateur, personne ne peut le bloquer**
 - Capture d'écran à intervalle configurable (fixe ou aléatoire/"jitté") uploadée au
   backend
+- **Analyse IA des captures** (`backend/src/screenshotAnalyzer.ts`) : chaque capture
+  est envoyée à Claude (vision) après upload, en arrière-plan (ne bloque jamais la
+  réponse à l'agent Windows). Si une anomalie est détectée avec une confiance
+  suffisante, un événement `ai_flag` est envoyé au dashboard comme **alerte à
+  valider par l'intervenant** — pas d'exclusion automatique, conformément à ce
+  qu'on avait décidé (l'IA peut se tromper, la perte de focus reste la seule règle
+  dure). Nécessite une variable d'environnement `ANTHROPIC_API_KEY` sur le serveur ;
+  sans clé, l'analyse est désactivée proprement (juste un avertissement dans les
+  logs, aucun crash).
 - Dashboard temps réel : présence des étudiants, journal d'événements, exclusion
   manuelle par l'intervenant
 
 ## Limites connues / prochaines étapes
 
-- **Analyse IA des captures d'écran : pas encore implémentée.** Le endpoint d'upload
-  existe (`POST /api/rooms/:code/sessions/:sessionId/screenshot`) et stocke déjà les
-  fichiers ; il ne reste qu'à brancher un appel à un modèle de vision dessus.
+- **Analyse IA : pas d'optimisation de coût.** Chaque capture déclenche un appel
+  au modèle, sans filtre préalable (diff d'image) pour éviter d'analyser des
+  captures quasi identiques — à ajouter avant un déploiement à grande échelle
+  (voir discussion projet).
 - **Restriction des fonctionnalités Excel (Ouvrir un fichier, macros, etc.) : non
   implémentée.** Ça ne passe pas par cette codebase — ça se configure via les stratégies
   Cloud Policy Microsoft 365 côté compte scolaire de l'étudiant (voir discussion projet).

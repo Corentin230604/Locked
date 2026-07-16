@@ -7,6 +7,9 @@ import { createServer } from "http";
 import { Server, Socket } from "socket.io";
 import { store } from "./store";
 import { RoomConfig } from "./types";
+import { analyzeScreenshot } from "./screenshotAnalyzer";
+
+const AI_FLAG_CONFIDENCE_THRESHOLD = 0.5;
 
 const PORT = Number(process.env.PORT ?? 4000);
 const UPLOAD_DIR = path.join(__dirname, "..", "uploads");
@@ -115,6 +118,24 @@ app.post(
       payload: { file: req.file.filename },
     });
     res.status(201).json({ ok: true });
+
+    // Runs after the response is sent: a slow or unavailable vision model
+    // must never delay the upload response the exam agent is waiting on.
+    analyzeScreenshot(req.file.path)
+      .then((analysis) => {
+        if (!analysis || !analysis.anomaly) return;
+        if (analysis.confidence < AI_FLAG_CONFIDENCE_THRESHOLD) return;
+
+        const flagEvent = store.recordViolation(sessionId, "ai_flag", { ...analysis });
+        io.to(roomChannel(room.code)).emit("dashboard:event", {
+          sessionId,
+          studentName: session.studentName,
+          type: "ai_flag",
+          timestamp: flagEvent.timestamp,
+          payload: analysis,
+        });
+      })
+      .catch((err) => console.error("Screenshot analysis error:", err));
   }
 );
 

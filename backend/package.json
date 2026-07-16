@@ -9,6 +9,7 @@
     "start": "node dist/server.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.111.0",
     "cors": "^2.8.5",
     "express": "^4.19.2",
     "multer": "^2.0.0",
