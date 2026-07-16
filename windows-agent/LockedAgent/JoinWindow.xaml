@@ -1,0 +1,16 @@
+<Window x:Class="LockedAgent.JoinWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Locked — Rejoindre une room" Height="280" Width="380"
+        WindowStartupLocation="CenterScreen" ResizeMode="NoResize">
+    <StackPanel Margin="20">
+        <TextBlock Text="Adresse du serveur" Margin="0,0,0,4"/>
+        <TextBox x:Name="ServerUrlBox" Text="http://localhost:4000" Margin="0,0,0,10"/>
+        <TextBlock Text="Code de la room" Margin="0,0,0,4"/>
+        <TextBox x:Name="RoomCodeBox" Margin="0,0,0,10"/>
+        <TextBlock Text="Votre nom" Margin="0,0,0,4"/>
+        <TextBox x:Name="StudentNameBox" Margin="0,0,0,16"/>
+        <Button x:Name="JoinButton" Content="Rejoindre l'examen" Padding="8" Click="JoinButton_Click"/>
+        <TextBlock x:Name="StatusText" Foreground="Red" Margin="0,10,0,0" TextWrapping="Wrap"/>
+    </StackPanel>
+</Window>

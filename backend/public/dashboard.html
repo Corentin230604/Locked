@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<title>Locked — Dashboard intervenant</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; background: #0f172a; color: #e2e8f0; }
+  header { padding: 1rem 1.5rem; background: #1e293b; display: flex; gap: 1rem; align-items: center; }
+  header input { padding: 0.4rem 0.6rem; border-radius: 6px; border: 1px solid #334155; background: #0f172a; color: #e2e8f0; }
+  header button { padding: 0.4rem 0.8rem; border-radius: 6px; border: none; background: #6366f1; color: white; cursor: pointer; }
+  main { padding: 1.5rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+  .card { background: #1e293b; border-radius: 10px; padding: 1rem; }
+  .student { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; border-radius: 8px; margin-bottom: 0.5rem; background: #0f172a; }
+  .status-active { color: #4ade80; }
+  .status-excluded { color: #f87171; }
+  .status-disconnected { color: #fbbf24; }
+  .excludeBtn { background: #ef4444; border: none; color: white; padding: 0.3rem 0.6rem; border-radius: 6px; cursor: pointer; }
+  .event { font-size: 0.85rem; padding: 0.35rem 0; border-bottom: 1px solid #334155; }
+  .event .type-focus_lost, .event .type-excluded { color: #f87171; }
+  .event .type-focus_returned, .event .type-joined { color: #4ade80; }
+  .event .type-screenshot { color: #93c5fd; }
+  #events { max-height: 70vh; overflow-y: auto; }
+</style>
+</head>
+<body>
+<header>
+  <strong>Locked</strong>
+  <input id="code" placeholder="Code de la room (ex: AB12CD)" />
+  <button id="joinBtn">Rejoindre</button>
+</header>
+<main>
+  <section class="card">
+    <h3>Étudiants</h3>
+    <div id="students"></div>
+  </section>
+  <section class="card">
+    <h3>Journal des événements</h3>
+    <div id="events"></div>
+  </section>
+</main>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  const socket = io();
+  const studentsEl = document.getElementById("students");
+  const eventsEl = document.getElementById("events");
+  const students = new Map();
+
+  function renderStudents() {
+    studentsEl.innerHTML = "";
+    for (const [sessionId, s] of students) {
+      const div = document.createElement("div");
+      div.className = "student";
+      div.innerHTML = `
+        <span>${s.studentName} — <span class="status-${s.status}">${s.status}</span></span>
+        <button class="excludeBtn" data-id="${sessionId}">Exclure</button>
+      `;
+      studentsEl.appendChild(div);
+    }
+    studentsEl.querySelectorAll(".excludeBtn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        socket.emit("dashboard:exclude", { sessionId: btn.dataset.id });
+      });
+    });
+  }
+
+  function logEvent(e) {
+    const div = document.createElement("div");
+    div.className = "event";
+    div.innerHTML = `<span class="type-${e.type}">[${e.type}]</span> ${e.studentName ?? ""} — ${new Date(e.timestamp).toLocaleTimeString()}`;
+    eventsEl.prepend(div);
+  }
+
+  document.getElementById("joinBtn").addEventListener("click", () => {
+    const code = document.getElementById("code").value.trim().toUpperCase();
+    if (!code) return;
+    socket.emit("dashboard:join", { code });
+  });
+
+  socket.on("dashboard:state", ({ sessions }) => {
+    students.clear();
+    for (const s of sessions) students.set(s.id, s);
+    renderStudents();
+    eventsEl.innerHTML = "";
+    for (const s of sessions) for (const v of s.violations) logEvent({ ...v, studentName: s.studentName });
+  });
+
+  socket.on("dashboard:presence", (p) => {
+    const existing = students.get(p.sessionId) ?? { id: p.sessionId };
+    students.set(p.sessionId, { ...existing, ...p });
+    renderStudents();
+  });
+
+  socket.on("dashboard:event", (e) => {
+    const existing = students.get(e.sessionId);
+    if (existing && e.type === "excluded") existing.status = "excluded";
+    if (existing && e.type === "disconnected") existing.status = "disconnected";
+    renderStudents();
+    logEvent(e);
+  });
+</script>
+</body>
+</html>

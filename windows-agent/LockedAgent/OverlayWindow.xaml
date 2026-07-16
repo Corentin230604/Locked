@@ -1,0 +1,23 @@
+<Window x:Class="LockedAgent.OverlayWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        WindowStyle="None"
+        WindowState="Maximized"
+        Topmost="True"
+        ShowInTaskbar="False"
+        Background="#E6B00000"
+        ResizeMode="NoResize">
+    <Grid>
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+            <TextBlock Text="Vous avez quitté Excel"
+                       FontSize="42" FontWeight="Bold" Foreground="White"
+                       HorizontalAlignment="Center"/>
+            <TextBlock Text="Revenez immédiatement, sinon vous serez exclu de l'examen"
+                       FontSize="20" Foreground="White" Margin="0,10,0,30"
+                       HorizontalAlignment="Center"/>
+            <TextBlock x:Name="CountdownText"
+                       FontSize="96" FontWeight="Bold" Foreground="White"
+                       HorizontalAlignment="Center"/>
+        </StackPanel>
+    </Grid>
+</Window>
