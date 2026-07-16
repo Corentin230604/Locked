@@ -53,6 +53,13 @@ export ANTHROPIC_API_KEY="..."   # optionnel — sans clé, l'analyse IA est jus
 npm run dev        # serveur sur http://localhost:4000
 ```
 
+Si le serveur échoue à joindre Supabase depuis un environnement derrière un proxy réseau
+(ex. certains environnements Claude Code sur le web) alors que `curl` y arrive, c'est que
+le `fetch` natif de Node ne respecte pas `HTTPS_PROXY` par défaut : ajouter
+`export NODE_USE_ENV_PROXY=1` avant de lancer le serveur (Node ≥ 22.21). Ce n'est
+qu'un détail de dev local — **Vercel n'a pas ce problème**, il gère son propre réseau
+sortant.
+
 Dashboard intervenant : ouvrir `http://localhost:4000/dashboard.html`, renseigner l'URL
 de l'API, l'URL Supabase, la **clé anon** (pas la clé service_role !) et le code de room.
 
@@ -123,10 +130,9 @@ aucune clé Supabase — il ne parle qu'à l'API (`/api/...`), qui seule détien
 
 ## Limites connues / prochaines étapes
 
-- **Non testé contre un vrai projet Supabase/Vercel.** Le code compile et le serveur de
-  dev démarre/gère les erreurs proprement (vérifié avec des identifiants factices), mais
-  aucun aller-retour réel n'a pu être fait ici faute d'accès à un compte Supabase/Vercel.
-  À valider avant tout déploiement.
+- **Testé contre un vrai projet Supabase** (room, join, événements, heartbeat, exclusion,
+  upload de capture) — **pas encore contre un vrai déploiement Vercel**, à valider avant
+  mise en production.
 - **Exclusion par polling, pas push.** L'agent Windows découvre une exclusion décidée
   par le prof en interrogeant sa session toutes les 3 secondes — délai de quelques
   secondes acceptable pour ce cas d'usage, mais ce n'est pas instantané comme l'était
