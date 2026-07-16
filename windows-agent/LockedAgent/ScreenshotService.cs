@@ -1,30 +1,29 @@
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Net.Http;
-using System.Net.Http.Headers;
+using System.Net.Http.Json;
 
 namespace LockedAgent;
 
 /// <summary>
 /// Captures the screen on the interval the teacher configured for the room (fixed
-/// or randomly jittered) and uploads each frame to the backend. Upload failures are
-/// swallowed on purpose: a flaky network shouldn't crash the agent mid-exam.
+/// or randomly jittered) and uploads each frame to the backend as base64 JSON.
+/// Upload failures are swallowed on purpose: a flaky network shouldn't crash the
+/// agent mid-exam.
 /// </summary>
 public sealed class ScreenshotService : IDisposable
 {
     private readonly HttpClient _http;
     private readonly string _baseUrl;
-    private readonly string _roomCode;
     private readonly string _sessionId;
     private readonly ScreenshotConfig _config;
     private readonly Random _random = new();
     private Timer? _timer;
 
-    public ScreenshotService(HttpClient http, string baseUrl, string roomCode, string sessionId, ScreenshotConfig config)
+    public ScreenshotService(HttpClient http, string baseUrl, string sessionId, ScreenshotConfig config)
     {
         _http = http;
-        _baseUrl = baseUrl;
-        _roomCode = roomCode;
+        _baseUrl = baseUrl.TrimEnd('/');
         _sessionId = sessionId;
         _config = config;
     }
@@ -55,14 +54,13 @@ public sealed class ScreenshotService : IDisposable
             using var bitmap = CaptureScreen();
             using var stream = new MemoryStream();
             bitmap.Save(stream, ImageFormat.Png);
-            stream.Position = 0;
+            var imageBase64 = Convert.ToBase64String(stream.ToArray());
 
-            using var content = new MultipartFormDataContent();
-            using var imageContent = new StreamContent(stream);
-            imageContent.Headers.ContentType = new MediaTypeHeaderValue("image/png");
-            content.Add(imageContent, "image", "screenshot.png");
-
-            await _http.PostAsync($"{_baseUrl}/api/rooms/{_roomCode}/sessions/{_sessionId}/screenshot", content);
+            await _http.PostAsJsonAsync($"{_baseUrl}/api/screenshot", new
+            {
+                sessionId = _sessionId,
+                imageBase64,
+            });
         }
         catch
         {

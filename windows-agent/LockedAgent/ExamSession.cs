@@ -12,7 +12,6 @@ namespace LockedAgent;
 public sealed class ExamSession
 {
     private readonly string _baseUrl;
-    private readonly string _roomCode;
     private readonly JoinResponse _join;
     private readonly HttpClient _http = new();
 
@@ -23,19 +22,17 @@ public sealed class ExamSession
     private OverlayWindow? _overlay;
     private DispatcherTimer? _heartbeatTimer;
 
-    public ExamSession(string baseUrl, string roomCode, JoinResponse join)
+    public ExamSession(string baseUrl, JoinResponse join)
     {
         _baseUrl = baseUrl;
-        _roomCode = roomCode;
         _join = join;
     }
 
-    public async Task StartAsync()
+    public Task StartAsync()
     {
-        _backend = new BackendClient(_baseUrl);
+        _backend = new BackendClient(_http, _baseUrl, _join.SessionId);
         _backend.Excluded += () => Application.Current.Dispatcher.Invoke(Exclude);
-        await _backend.ConnectAsync();
-        await _backend.JoinAsync(_roomCode, _join.SessionId);
+        _backend.StartPollingForExclusion();
 
         var excelProcess = new ExcelLauncher().Launch();
 
@@ -47,12 +44,14 @@ public sealed class ExamSession
         _keyboardHook.Install();
 
         _screenshotService = new ScreenshotService(
-            _http, _baseUrl, _roomCode, _join.SessionId, _join.Config.Screenshot);
+            _http, _baseUrl, _join.SessionId, _join.Config.Screenshot);
         _screenshotService.Start();
 
         _heartbeatTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(15) };
         _heartbeatTimer.Tick += async (_, _) => await _backend.SendHeartbeatAsync();
         _heartbeatTimer.Start();
+
+        return Task.CompletedTask;
     }
 
     private void OnFocusLost()
@@ -89,7 +88,7 @@ public sealed class ExamSession
         _focusWatcher?.Dispose();
         _screenshotService?.Dispose();
         _heartbeatTimer?.Stop();
-        _backend?.Dispose();
+        _ = _backend?.DisposeAsync(); // app is shutting down right after; fire-and-forget is fine
         // TODO: show a dedicated "vous avez été exclu" screen and terminate Excel
         // gracefully before shutting down, instead of exiting the whole agent.
         Application.Current.Shutdown();

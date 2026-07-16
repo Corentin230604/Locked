@@ -31,7 +31,7 @@ public partial class JoinWindow : Window
             }
 
             using var http = new HttpClient();
-            var response = await http.PostAsJsonAsync($"{baseUrl}/api/rooms/{roomCode}/join", new { studentName });
+            var response = await http.PostAsJsonAsync($"{baseUrl}/api/join", new { code = roomCode, studentName });
             if (!response.IsSuccessStatusCode)
             {
                 StatusText.Text = $"Impossible de rejoindre la room ({(int)response.StatusCode}).";
@@ -41,7 +41,7 @@ public partial class JoinWindow : Window
             var join = await response.Content.ReadFromJsonAsync<JoinResponse>(JsonOptions)
                 ?? throw new InvalidOperationException("Réponse du serveur invalide.");
 
-            var session = new ExamSession(baseUrl, roomCode, join);
+            var session = new ExamSession(baseUrl, join);
             await session.StartAsync();
 
             Hide();

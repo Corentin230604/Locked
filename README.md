@@ -11,35 +11,77 @@ avant tout déploiement réel.
 ## Architecture
 
 ```
-backend/          Serveur Node.js/TypeScript : rooms, sessions, événements temps réel
-                   (Socket.IO), dashboard intervenant (page statique servie par le backend)
-windows-agent/     Application Windows (C#/.NET 8, WPF) installée sur le PC de l'étudiant :
-                   lance Excel en plein écran, détecte la perte de focus, capture des
-                   captures d'écran, communique avec le backend
+backend/          Fonctions serverless Node.js/TypeScript (déployables sur Vercel),
+                   logique métier dans backend/src/lib/, dashboard intervenant statique
+supabase/          Schéma SQL (tables + politiques RLS + bucket de stockage)
+windows-agent/     Application Windows (C#/.NET 8, WPF) installée sur le PC de l'étudiant
 ```
+
+**Base de données + temps réel : Supabase.** Postgres pour les rooms/sessions/violations,
+Storage pour les captures d'écran, Realtime (Postgres Changes) pour le flux live du
+dashboard. **Hébergement des routes API : Vercel.** Ce choix a une conséquence
+architecturale importante : Vercel est serverless (pas de process persistant), donc
+**pas de Socket.IO** — le temps réel passe par Supabase Realtime (le dashboard s'abonne
+directement aux tables `sessions`/`violations`), et l'agent Windows détecte une
+exclusion déclenchée par le prof en **interrogeant sa propre session toutes les 3
+secondes** plutôt que de recevoir un message poussé par le serveur (il n'y a plus de
+canal serveur → agent une fois Socket.IO retiré). Voir la discussion projet pour le
+raisonnement complet.
 
 Pas d'agent macOS pour l'instant (l'architecture est la même : app native + hooks
 `NSWorkspace`/`CGEventTap` au lieu de `SetWinEventHook`/`SetWindowsHookEx`). Pas d'agent
-iOS : cf. discussion — nécessite un parc de tablettes géré en MDM par l'école, hors
-périmètre d'un développement logiciel classique.
+iOS : nécessite un parc de tablettes géré en MDM par l'école, hors périmètre d'un
+développement logiciel classique.
 
-## Faire tourner le backend
+## Mettre en place Supabase
+
+1. Créer un projet sur [supabase.com](https://supabase.com).
+2. Dans l'éditeur SQL du projet, exécuter `supabase/schema.sql` (tables, politiques RLS,
+   bucket de stockage `screenshots`).
+3. Récupérer, dans les réglages du projet : l'URL du projet, la clé `service_role`
+   (secrète, jamais exposée au navigateur ni à l'agent Windows) et la clé `anon`
+   (publique, utilisée uniquement par le dashboard pour lire en temps réel).
+
+## Faire tourner le backend en local
 
 ```bash
 cd backend
 npm install
+export SUPABASE_URL="https://xxxx.supabase.co"
+export SUPABASE_SERVICE_ROLE_KEY="..."
+export ANTHROPIC_API_KEY="..."   # optionnel — sans clé, l'analyse IA est juste désactivée
 npm run dev        # serveur sur http://localhost:4000
 ```
 
-Dashboard intervenant : ouvrir `http://localhost:4000/dashboard.html`, entrer le code de
-room (retourné par `POST /api/rooms`) pour voir les étudiants et le flux d'événements en
-direct.
+Dashboard intervenant : ouvrir `http://localhost:4000/dashboard.html`, renseigner l'URL
+de l'API, l'URL Supabase, la **clé anon** (pas la clé service_role !) et le code de room.
 
-API principale :
+API principale (REST, sans WebSocket) :
 - `POST /api/rooms` `{ teacherName, config }` → crée une room, retourne son `code`
-- `POST /api/rooms/:code/join` `{ studentName }` → retourne `sessionId` + `config`
-- WebSocket (Socket.IO) : `agent:join`, `agent:event`, `agent:heartbeat`,
-  `dashboard:join`, `dashboard:exclude`, `agent:command`
+- `GET /api/rooms?code=XXX` → infos d'une room
+- `POST /api/join` `{ code, studentName }` → retourne `sessionId` + `config`
+- `GET /api/sessions?code=XXX` → snapshot des sessions d'une room (dashboard, chargement initial)
+- `GET /api/session?sessionId=XXX` → statut d'une session (pollé par l'agent Windows)
+- `POST /api/events` `{ sessionId, type, payload }` → relai d'un événement agent (focus perdu/retrouvé, exclusion, déconnexion)
+- `POST /api/heartbeat` `{ sessionId }`
+- `POST /api/screenshot` `{ sessionId, imageBase64 }` → upload + analyse IA (synchrone)
+- `POST /api/exclude` `{ sessionId }` → exclusion manuelle par l'intervenant
+
+## Déployer sur Vercel
+
+```bash
+cd backend
+vercel deploy
+```
+
+Configurer dans le projet Vercel les variables d'environnement `SUPABASE_URL`,
+`SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`. **Non testé dans cet environnement de
+développement** (pas d'accès à un compte Vercel ni à un vrai projet Supabase ici) — la
+structure du code suit les conventions Vercel (un fichier = une fonction sous `api/`),
+mais un premier déploiement réel doit être vérifié avant mise en production. Le fichier
+`vercel.json` augmente le timeout de `api/screenshot.ts` à 30s (l'appel au modèle de
+vision peut prendre quelques secondes) — à revoir si le plan Vercel utilisé plafonne
+plus bas.
 
 ## Faire tourner l'agent Windows
 
@@ -52,9 +94,11 @@ cd windows-agent/LockedAgent
 dotnet run
 ```
 
-Renseigner l'adresse du serveur, le code de room, et un nom, puis "Rejoindre l'examen".
-Excel se lance en plein écran ; sortir de la fenêtre affiche l'overlay rouge avec compte
-à rebours configuré par l'intervenant.
+Renseigner l'adresse du serveur (Vercel ou localhost), le code de room, et un nom, puis
+"Rejoindre l'examen". Excel se lance en plein écran ; sortir de la fenêtre affiche
+l'overlay rouge avec compte à rebours configuré par l'intervenant. L'agent ne détient
+aucune clé Supabase — il ne parle qu'à l'API (`/api/...`), qui seule détient la clé
+`service_role`.
 
 ## Ce qui est implémenté
 
@@ -65,33 +109,38 @@ Excel se lance en plein écran ; sortir de la fenêtre affiche l'overlay rouge a
 - Blocage best-effort de quelques raccourcis (Alt+Tab, touche Windows, Alt+F4) via un
   hook clavier bas niveau — **Ctrl+Alt+Del est volontairement non intercepté : Windows
   ne le délivre à aucun hook utilisateur, personne ne peut le bloquer**
-- Capture d'écran à intervalle configurable (fixe ou aléatoire/"jitté") uploadée au
-  backend
+- Capture d'écran à intervalle configurable (fixe ou aléatoire/"jitté"), envoyée en
+  base64 à l'API et stockée dans Supabase Storage
 - **Analyse IA des captures** (`backend/src/screenshotAnalyzer.ts`) : chaque capture
-  est envoyée à Claude (vision) après upload, en arrière-plan (ne bloque jamais la
-  réponse à l'agent Windows). Si une anomalie est détectée avec une confiance
-  suffisante, un événement `ai_flag` est envoyé au dashboard comme **alerte à
-  valider par l'intervenant** — pas d'exclusion automatique, conformément à ce
-  qu'on avait décidé (l'IA peut se tromper, la perte de focus reste la seule règle
-  dure). Nécessite une variable d'environnement `ANTHROPIC_API_KEY` sur le serveur ;
-  sans clé, l'analyse est désactivée proprement (juste un avertissement dans les
-  logs, aucun crash).
-- Dashboard temps réel : présence des étudiants, journal d'événements, exclusion
-  manuelle par l'intervenant
+  est analysée par Claude (vision) au moment de l'upload. Si une anomalie est détectée
+  avec une confiance suffisante, un événement `ai_flag` est inséré dans `violations` —
+  le dashboard le voit apparaître en temps réel comme **alerte à valider par
+  l'intervenant**, pas d'exclusion automatique (l'IA peut se tromper, la perte de focus
+  reste la seule règle dure). Sans `ANTHROPIC_API_KEY`, l'analyse est désactivée
+  proprement (avertissement dans les logs, aucun crash).
+- Dashboard temps réel (Supabase Realtime) : présence des étudiants, journal
+  d'événements, exclusion manuelle par l'intervenant
 
 ## Limites connues / prochaines étapes
 
+- **Non testé contre un vrai projet Supabase/Vercel.** Le code compile et le serveur de
+  dev démarre/gère les erreurs proprement (vérifié avec des identifiants factices), mais
+  aucun aller-retour réel n'a pu être fait ici faute d'accès à un compte Supabase/Vercel.
+  À valider avant tout déploiement.
+- **Exclusion par polling, pas push.** L'agent Windows découvre une exclusion décidée
+  par le prof en interrogeant sa session toutes les 3 secondes — délai de quelques
+  secondes acceptable pour ce cas d'usage, mais ce n'est pas instantané comme l'était
+  Socket.IO.
 - **Analyse IA : pas d'optimisation de coût.** Chaque capture déclenche un appel
   au modèle, sans filtre préalable (diff d'image) pour éviter d'analyser des
-  captures quasi identiques — à ajouter avant un déploiement à grande échelle
-  (voir discussion projet).
+  captures quasi identiques — à ajouter avant un déploiement à grande échelle.
 - **Restriction des fonctionnalités Excel (Ouvrir un fichier, macros, etc.) : non
   implémentée.** Ça ne passe pas par cette codebase — ça se configure via les stratégies
   Cloud Policy Microsoft 365 côté compte scolaire de l'étudiant (voir discussion projet).
-- **Persistance en mémoire uniquement** (`backend/src/store.ts`) : tout est perdu au
-  redémarrage du serveur. À remplacer par une vraie base de données avant un usage réel.
 - **Aucune authentification** sur les routes intervenant/étudiant : à ajouter avant tout
-  déploiement au-delà d'un test interne.
+  déploiement au-delà d'un test interne. La politique RLS Supabase n'autorise en lecture
+  que la clé anon (dashboard) ; toutes les écritures passent par la clé service_role
+  côté serveur uniquement.
 - **Pas d'agent macOS.**
 - **Conformité RGPD non traitée dans le code** (consentement/information, durée de
   conservation des captures, base légale) : c'est un prérequis produit/juridique, pas

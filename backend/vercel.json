@@ -1,0 +1,5 @@
+{
+  "functions": {
+    "api/screenshot.ts": { "maxDuration": 30 }
+  }
+}

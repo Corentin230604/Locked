@@ -5,7 +5,7 @@
 <title>Locked — Dashboard intervenant</title>
 <style>
   body { font-family: system-ui, sans-serif; margin: 0; background: #0f172a; color: #e2e8f0; }
-  header { padding: 1rem 1.5rem; background: #1e293b; display: flex; gap: 1rem; align-items: center; }
+  header { padding: 1rem 1.5rem; background: #1e293b; display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
   header input { padding: 0.4rem 0.6rem; border-radius: 6px; border: 1px solid #334155; background: #0f172a; color: #e2e8f0; }
   header button { padding: 0.4rem 0.8rem; border-radius: 6px; border: none; background: #6366f1; color: white; cursor: pointer; }
   main { padding: 1.5rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
@@ -21,13 +21,18 @@
   .event .type-screenshot { color: #93c5fd; }
   .event .type-ai_flag { color: #fbbf24; font-weight: 600; }
   #events { max-height: 70vh; overflow-y: auto; }
+  #status { font-size: 0.8rem; color: #94a3b8; }
 </style>
 </head>
 <body>
 <header>
   <strong>Locked</strong>
-  <input id="code" placeholder="Code de la room (ex: AB12CD)" />
+  <input id="apiUrl" placeholder="URL de l'API (ex: http://localhost:4000)" size="28" />
+  <input id="supabaseUrl" placeholder="URL Supabase" size="24" />
+  <input id="supabaseAnonKey" placeholder="Clé anon Supabase" size="24" />
+  <input id="code" placeholder="Code de la room" size="12" />
   <button id="joinBtn">Rejoindre</button>
+  <span id="status"></span>
 </header>
 <main>
   <section class="card">
@@ -40,12 +45,18 @@
   </section>
 </main>
 
-<script src="/socket.io/socket.io.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
-  const socket = io();
   const studentsEl = document.getElementById("students");
   const eventsEl = document.getElementById("events");
-  const students = new Map();
+  const statusEl = document.getElementById("status");
+  const students = new Map(); // sessionId -> session row
+
+  const fields = ["apiUrl", "supabaseUrl", "supabaseAnonKey", "code"];
+  for (const id of fields) {
+    const el = document.getElementById(id);
+    el.value = localStorage.getItem("locked_" + id) || (id === "apiUrl" ? "http://localhost:4000" : "");
+  }
 
   function renderStudents() {
     studentsEl.innerHTML = "";
@@ -53,52 +64,81 @@
       const div = document.createElement("div");
       div.className = "student";
       div.innerHTML = `
-        <span>${s.studentName} — <span class="status-${s.status}">${s.status}</span></span>
+        <span>${s.student_name} — <span class="status-${s.status}">${s.status}</span></span>
         <button class="excludeBtn" data-id="${sessionId}">Exclure</button>
       `;
       studentsEl.appendChild(div);
     }
     studentsEl.querySelectorAll(".excludeBtn").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        socket.emit("dashboard:exclude", { sessionId: btn.dataset.id });
-      });
+      btn.addEventListener("click", () => excludeSession(btn.dataset.id));
     });
   }
 
-  function logEvent(e) {
+  function logEvent(v) {
     const div = document.createElement("div");
     div.className = "event";
-    const reason = e.type === "ai_flag" && e.payload?.reason ? ` — ${e.payload.reason}` : "";
-    div.innerHTML = `<span class="type-${e.type}">[${e.type}]</span> ${e.studentName ?? ""} — ${new Date(e.timestamp).toLocaleTimeString()}${reason}`;
+    const studentName = students.get(v.session_id)?.student_name ?? "";
+    const reason = v.type === "ai_flag" && v.payload?.reason ? ` — ${v.payload.reason}` : "";
+    div.innerHTML = `<span class="type-${v.type}">[${v.type}]</span> ${studentName} — ${new Date(v.created_at).toLocaleTimeString()}${reason}`;
     eventsEl.prepend(div);
   }
 
-  document.getElementById("joinBtn").addEventListener("click", () => {
-    const code = document.getElementById("code").value.trim().toUpperCase();
-    if (!code) return;
-    socket.emit("dashboard:join", { code });
-  });
+  async function excludeSession(sessionId) {
+    const apiUrl = document.getElementById("apiUrl").value.trim();
+    await fetch(`${apiUrl}/api/exclude`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId }),
+    });
+  }
 
-  socket.on("dashboard:state", ({ sessions }) => {
+  document.getElementById("joinBtn").addEventListener("click", async () => {
+    const apiUrl = document.getElementById("apiUrl").value.trim();
+    const supabaseUrl = document.getElementById("supabaseUrl").value.trim();
+    const supabaseAnonKey = document.getElementById("supabaseAnonKey").value.trim();
+    const code = document.getElementById("code").value.trim().toUpperCase();
+    if (!apiUrl || !supabaseUrl || !supabaseAnonKey || !code) {
+      statusEl.textContent = "Renseigne les 4 champs.";
+      return;
+    }
+    for (const [id, val] of Object.entries({ apiUrl, supabaseUrl, supabaseAnonKey, code })) {
+      localStorage.setItem("locked_" + id, val);
+    }
+
+    statusEl.textContent = "Connexion...";
+    const res = await fetch(`${apiUrl}/api/sessions?code=${encodeURIComponent(code)}`);
+    if (!res.ok) {
+      statusEl.textContent = "Room introuvable.";
+      return;
+    }
+    const { room, sessions } = await res.json();
+
     students.clear();
+    eventsEl.innerHTML = "";
     for (const s of sessions) students.set(s.id, s);
     renderStudents();
-    eventsEl.innerHTML = "";
-    for (const s of sessions) for (const v of s.violations) logEvent({ ...v, studentName: s.studentName });
-  });
 
-  socket.on("dashboard:presence", (p) => {
-    const existing = students.get(p.sessionId) ?? { id: p.sessionId };
-    students.set(p.sessionId, { ...existing, ...p });
-    renderStudents();
-  });
-
-  socket.on("dashboard:event", (e) => {
-    const existing = students.get(e.sessionId);
-    if (existing && e.type === "excluded") existing.status = "excluded";
-    if (existing && e.type === "disconnected") existing.status = "disconnected";
-    renderStudents();
-    logEvent(e);
+    const client = supabase.createClient(supabaseUrl, supabaseAnonKey);
+    client
+      .channel(`room-${room.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "sessions", filter: `room_id=eq.${room.id}` },
+        (payload) => {
+          const row = payload.new;
+          if (!row?.id) return;
+          students.set(row.id, row);
+          renderStudents();
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "violations", filter: `room_id=eq.${room.id}` },
+        (payload) => logEvent(payload.new)
+      )
+      .subscribe((status) => {
+        statusEl.textContent = status === "SUBSCRIBED" ? `Connecté à ${room.code}` : status;
+      });
   });
 </script>
 </body>

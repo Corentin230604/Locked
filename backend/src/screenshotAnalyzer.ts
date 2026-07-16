@@ -1,4 +1,3 @@
-import fs from "fs";
 import Anthropic from "@anthropic-ai/sdk";
 
 export interface ScreenshotAnalysis {
@@ -54,13 +53,13 @@ function getClient(): Anthropic | null {
  * AI layer never interrupts the exam or the upload endpoint.
  */
 export async function analyzeScreenshot(
-  imagePath: string
+  imageBuffer: Buffer
 ): Promise<ScreenshotAnalysis | null> {
   const anthropic = getClient();
   if (!anthropic) return null;
 
   try {
-    const imageData = fs.readFileSync(imagePath).toString("base64");
+    const imageData = imageBuffer.toString("base64");
     const response = await anthropic.messages.create({
       model: "claude-opus-4-8",
       max_tokens: 1024,
