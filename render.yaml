@@ -1,0 +1,18 @@
+# Render Blueprint — see https://render.com/docs/blueprint-spec
+# In the Render dashboard: New > Blueprint, point it at this repo, it picks
+# this file up automatically. Secrets (marked sync: false) are prompted for
+# at creation time and are not stored in this file or in git.
+services:
+  - type: web
+    name: locked-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false

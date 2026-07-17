@@ -11,9 +11,10 @@ avant tout déploiement réel.
 ## Architecture
 
 ```
-backend/          API Node.js/TypeScript (backend/api/*.ts), packagée en process
-                   persistant pour Fly.io (Dockerfile) — reste aussi compatible Vercel
-                   (fonctions serverless). Logique métier dans backend/src/lib/,
+render.yaml        Blueprint Render (référence backend/Dockerfile)
+backend/           API Node.js/TypeScript (backend/api/*.ts), packagée en process
+                   persistant (Dockerfile) — reste aussi compatible Vercel (fonctions
+                   serverless) et Fly.io. Logique métier dans backend/src/lib/,
                    dashboard intervenant statique dans backend/public/.
 supabase/          Schéma SQL (tables + politiques RLS + bucket de stockage)
 windows-agent/     Application Windows (C#/.NET 8, WPF) installée sur le PC de l'étudiant
@@ -21,17 +22,19 @@ windows-agent/     Application Windows (C#/.NET 8, WPF) installée sur le PC de 
 
 **Base de données + temps réel : Supabase.** Postgres pour les rooms/sessions/violations,
 Storage pour les captures d'écran, Realtime (Postgres Changes) pour le flux live du
-dashboard. **Hébergement de l'API : Fly.io** (voir "Déployer sur Fly.io" plus bas).
+dashboard. **Hébergement de l'API : Render** (voir "Déployer sur Render" plus bas) —
+palier gratuit sans carte bancaire, contrairement à Fly.io/Railway qui exigent
+maintenant une carte et facturent au-delà d'un essai très court.
 
 Le code a d'abord été écrit pour un hébergement serverless (Vercel), sans process
 persistant possible — c'est pour ça qu'il n'y a **pas de Socket.IO** : le temps réel
 passe par Supabase Realtime (le dashboard s'abonne directement aux tables
 `sessions`/`violations`), et l'agent Windows détecte une exclusion déclenchée par le
 prof en **interrogeant sa propre session toutes les 3 secondes** plutôt que de recevoir
-un message poussé par le serveur. Fly.io fait tourner un process persistant, donc rien
-n'empêcherait de réintroduire un vrai push serveur→agent plus tard — mais l'architecture
-Supabase Realtime + polling fonctionne déjà et n'a pas été changée en migrant vers
-Fly.io. Voir la discussion projet pour le raisonnement complet.
+un message poussé par le serveur. Render (comme Fly.io) fait tourner un process
+persistant, donc rien n'empêcherait de réintroduire un vrai push serveur→agent plus
+tard — mais l'architecture Supabase Realtime + polling fonctionne déjà et n'a pas été
+changée en migrant d'hébergeur. Voir la discussion projet pour le raisonnement complet.
 
 Pas d'agent macOS pour l'instant (l'architecture est la même : app native + hooks
 `NSWorkspace`/`CGEventTap` au lieu de `SetWinEventHook`/`SetWindowsHookEx`). Pas d'agent
@@ -79,45 +82,41 @@ API principale (REST, sans WebSocket) :
 - `POST /api/screenshot` `{ sessionId, imageBase64 }` → upload + analyse IA (synchrone)
 - `POST /api/exclude` `{ sessionId }` → exclusion manuelle par l'intervenant
 
-## Déployer sur Fly.io
+## Déployer sur Render
 
-Fly.io fait tourner un process persistant (pas du serverless comme Vercel) : c'est
+Render fait tourner un process persistant (pas du serverless comme Vercel) : c'est
 `backend/src/devServer.ts` (le même serveur Express que pour le dev local) qui tourne en
-production, packagé via `backend/Dockerfile`.
+production, packagé via `backend/Dockerfile`. Palier gratuit sans carte bancaire — voir
+"Limites connues" pour le compromis (mise en veille après inactivité).
 
+**Via le dashboard Render (le plus simple) :**
+1. New → Blueprint, connecter ce dépôt GitHub. Render détecte `render.yaml` à la racine
+   automatiquement (il référence `backend/Dockerfile`).
+2. Render demande les valeurs des variables marquées `sync: false` dans `render.yaml` :
+   `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY` (optionnelle).
+3. Déployer. Render construit l'image Docker et donne une URL `https://<nom>.onrender.com`.
+
+**Via le CLI**, si le repo n'est pas connecté à Render :
 ```bash
-cd backend
-fly launch --no-deploy    # détecte le Dockerfile, crée l'app (ou reprend fly.toml)
-fly secrets set SUPABASE_URL="https://xxxx.supabase.co" \
-  SUPABASE_SERVICE_ROLE_KEY="..." \
-  ANTHROPIC_API_KEY="..."          # optionnel
-fly deploy
+render blueprint launch   # nécessite render-cli, lit render.yaml à la racine
 ```
 
-`fly.toml` configure `auto_stop_machines`/`min_machines_running = 0` — la machine peut
-se mettre en veille après une période d'inactivité et redémarre à la prochaine requête
-(délai de démarrage à froid de quelques secondes). Mettre `min_machines_running = 1`
-pour un service toujours actif, au prix d'une facturation continue au lieu de
-consommer seulement à l'usage.
+Le service est sur le plan `free` (voir `render.yaml`) : il se met en veille après une
+période d'inactivité et redémarre au prochain appel (30 à 60 secondes de délai à froid).
+Pour ce cas d'usage (le prof lance la room quelques minutes avant l'examen), ce délai
+tombe avant que les étudiants ne rejoignent — passer au plan payant si un démarrage
+instantané est nécessaire.
 
-**Non testé dans cet environnement de développement** (pas d'accès à un compte Fly.io
+**Non testé dans cet environnement de développement** (pas d'accès à un compte Render
 ici) — vérifié en revanche : le serveur compilé (`npm run build && node
 dist/src/devServer.js`, exactement ce que lance le `Dockerfile`) démarre correctement et
 sert bien le dashboard statique en plus des routes API.
 
-### Alternative : Vercel
+### Alternatives : Fly.io, Vercel
 
-Le code reste compatible Vercel (`backend/api/*.ts`, un fichier = une fonction
-serverless) si tu changes d'avis :
-
-```bash
-cd backend
-vercel deploy
-```
-
-Variables d'environnement à configurer côté Vercel : `SUPABASE_URL`,
-`SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`. `vercel.json` augmente le timeout de
-`api/screenshot.ts` à 30s pour l'appel au modèle de vision.
+Le code reste compatible avec les deux si besoin de changer à nouveau :
+- **Fly.io** : `backend/fly.toml` + `backend/Dockerfile` déjà présents (`fly launch --no-deploy && fly secrets set ... && fly deploy`) — mais carte bancaire obligatoire et facturation au-delà d'un essai très court (voir discussion projet).
+- **Vercel** : `backend/api/*.ts` (un fichier = une fonction serverless) + `vercel deploy`. Mêmes variables d'environnement à configurer côté Vercel.
 
 ## Faire tourner l'agent Windows
 
@@ -160,8 +159,12 @@ aucune clé Supabase — il ne parle qu'à l'API (`/api/...`), qui seule détien
 ## Limites connues / prochaines étapes
 
 - **Testé contre un vrai projet Supabase** (room, join, événements, heartbeat, exclusion,
-  upload de capture) — **pas encore contre un vrai déploiement Fly.io**, à valider avant
+  upload de capture) — **pas encore contre un vrai déploiement Render**, à valider avant
   mise en production.
+- **Mise en veille du plan gratuit Render** : si une room est créée juste après une
+  longue période d'inactivité, le premier appel (création de room) subit un délai à
+  froid de 30-60s avant que le serveur ne réponde — sans conséquence si le prof lance la
+  room quelques minutes avant l'examen, à surveiller si l'usage devient plus imprévisible.
 - **Exclusion par polling, pas push.** L'agent Windows découvre une exclusion décidée
   par le prof en interrogeant sa session toutes les 3 secondes — délai de quelques
   secondes acceptable pour ce cas d'usage, mais ce n'est pas instantané comme l'était
