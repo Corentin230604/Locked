@@ -13,18 +13,23 @@ import excludeHandler from "../api/exclude";
 import screenshotHandler from "../api/screenshot";
 
 /**
- * Local-only dev server: mounts the exact same handler functions Vercel runs
- * in production, so there's a single source of truth for the API logic.
- * Express's req/res are structurally compatible with VercelRequest/Response
- * for the subset of members these handlers use (method, query, body,
- * status/json).
+ * Express entrypoint mounting the same handler functions Vercel's serverless
+ * runtime would run — single source of truth for the API logic. Used for
+ * local dev (`npm run dev`, via ts-node-dev) and as the production server on
+ * any platform that runs a persistent process instead of serverless
+ * functions (Fly.io, Railway, Render, ...). Express's req/res are
+ * structurally compatible with VercelRequest/Response for the subset of
+ * members these handlers use (method, query, body, status/json).
  */
 const PORT = Number(process.env.PORT ?? 4000);
 
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: "10mb" })); // screenshots arrive as base64 JSON
-app.use("/", express.static(path.join(__dirname, "..", "public")));
+// process.cwd() (not __dirname) so this resolves the same way whether run
+// via ts-node-dev on src/devServer.ts or as compiled dist/src/devServer.js —
+// both are started with the backend/ directory as the working directory.
+app.use("/", express.static(path.join(process.cwd(), "public")));
 
 function mount(route: string, handler: (req: VercelRequest, res: VercelResponse) => Promise<void>) {
   app.all(route, (req: Request, res: Response) => {

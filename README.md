@@ -11,22 +11,27 @@ avant tout déploiement réel.
 ## Architecture
 
 ```
-backend/          Fonctions serverless Node.js/TypeScript (déployables sur Vercel),
-                   logique métier dans backend/src/lib/, dashboard intervenant statique
+backend/          API Node.js/TypeScript (backend/api/*.ts), packagée en process
+                   persistant pour Fly.io (Dockerfile) — reste aussi compatible Vercel
+                   (fonctions serverless). Logique métier dans backend/src/lib/,
+                   dashboard intervenant statique dans backend/public/.
 supabase/          Schéma SQL (tables + politiques RLS + bucket de stockage)
 windows-agent/     Application Windows (C#/.NET 8, WPF) installée sur le PC de l'étudiant
 ```
 
 **Base de données + temps réel : Supabase.** Postgres pour les rooms/sessions/violations,
 Storage pour les captures d'écran, Realtime (Postgres Changes) pour le flux live du
-dashboard. **Hébergement des routes API : Vercel.** Ce choix a une conséquence
-architecturale importante : Vercel est serverless (pas de process persistant), donc
-**pas de Socket.IO** — le temps réel passe par Supabase Realtime (le dashboard s'abonne
-directement aux tables `sessions`/`violations`), et l'agent Windows détecte une
-exclusion déclenchée par le prof en **interrogeant sa propre session toutes les 3
-secondes** plutôt que de recevoir un message poussé par le serveur (il n'y a plus de
-canal serveur → agent une fois Socket.IO retiré). Voir la discussion projet pour le
-raisonnement complet.
+dashboard. **Hébergement de l'API : Fly.io** (voir "Déployer sur Fly.io" plus bas).
+
+Le code a d'abord été écrit pour un hébergement serverless (Vercel), sans process
+persistant possible — c'est pour ça qu'il n'y a **pas de Socket.IO** : le temps réel
+passe par Supabase Realtime (le dashboard s'abonne directement aux tables
+`sessions`/`violations`), et l'agent Windows détecte une exclusion déclenchée par le
+prof en **interrogeant sa propre session toutes les 3 secondes** plutôt que de recevoir
+un message poussé par le serveur. Fly.io fait tourner un process persistant, donc rien
+n'empêcherait de réintroduire un vrai push serveur→agent plus tard — mais l'architecture
+Supabase Realtime + polling fonctionne déjà et n'a pas été changée en migrant vers
+Fly.io. Voir la discussion projet pour le raisonnement complet.
 
 Pas d'agent macOS pour l'instant (l'architecture est la même : app native + hooks
 `NSWorkspace`/`CGEventTap` au lieu de `SetWinEventHook`/`SetWindowsHookEx`). Pas d'agent
@@ -74,21 +79,45 @@ API principale (REST, sans WebSocket) :
 - `POST /api/screenshot` `{ sessionId, imageBase64 }` → upload + analyse IA (synchrone)
 - `POST /api/exclude` `{ sessionId }` → exclusion manuelle par l'intervenant
 
-## Déployer sur Vercel
+## Déployer sur Fly.io
+
+Fly.io fait tourner un process persistant (pas du serverless comme Vercel) : c'est
+`backend/src/devServer.ts` (le même serveur Express que pour le dev local) qui tourne en
+production, packagé via `backend/Dockerfile`.
+
+```bash
+cd backend
+fly launch --no-deploy    # détecte le Dockerfile, crée l'app (ou reprend fly.toml)
+fly secrets set SUPABASE_URL="https://xxxx.supabase.co" \
+  SUPABASE_SERVICE_ROLE_KEY="..." \
+  ANTHROPIC_API_KEY="..."          # optionnel
+fly deploy
+```
+
+`fly.toml` configure `auto_stop_machines`/`min_machines_running = 0` — la machine peut
+se mettre en veille après une période d'inactivité et redémarre à la prochaine requête
+(délai de démarrage à froid de quelques secondes). Mettre `min_machines_running = 1`
+pour un service toujours actif, au prix d'une facturation continue au lieu de
+consommer seulement à l'usage.
+
+**Non testé dans cet environnement de développement** (pas d'accès à un compte Fly.io
+ici) — vérifié en revanche : le serveur compilé (`npm run build && node
+dist/src/devServer.js`, exactement ce que lance le `Dockerfile`) démarre correctement et
+sert bien le dashboard statique en plus des routes API.
+
+### Alternative : Vercel
+
+Le code reste compatible Vercel (`backend/api/*.ts`, un fichier = une fonction
+serverless) si tu changes d'avis :
 
 ```bash
 cd backend
 vercel deploy
 ```
 
-Configurer dans le projet Vercel les variables d'environnement `SUPABASE_URL`,
-`SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`. **Non testé dans cet environnement de
-développement** (pas d'accès à un compte Vercel ni à un vrai projet Supabase ici) — la
-structure du code suit les conventions Vercel (un fichier = une fonction sous `api/`),
-mais un premier déploiement réel doit être vérifié avant mise en production. Le fichier
-`vercel.json` augmente le timeout de `api/screenshot.ts` à 30s (l'appel au modèle de
-vision peut prendre quelques secondes) — à revoir si le plan Vercel utilisé plafonne
-plus bas.
+Variables d'environnement à configurer côté Vercel : `SUPABASE_URL`,
+`SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`. `vercel.json` augmente le timeout de
+`api/screenshot.ts` à 30s pour l'appel au modèle de vision.
 
 ## Faire tourner l'agent Windows
 
@@ -101,7 +130,7 @@ cd windows-agent/LockedAgent
 dotnet run
 ```
 
-Renseigner l'adresse du serveur (Vercel ou localhost), le code de room, et un nom, puis
+Renseigner l'adresse du serveur (Fly.io ou localhost), le code de room, et un nom, puis
 "Rejoindre l'examen". Excel se lance en plein écran ; sortir de la fenêtre affiche
 l'overlay rouge avec compte à rebours configuré par l'intervenant. L'agent ne détient
 aucune clé Supabase — il ne parle qu'à l'API (`/api/...`), qui seule détient la clé
@@ -131,7 +160,7 @@ aucune clé Supabase — il ne parle qu'à l'API (`/api/...`), qui seule détien
 ## Limites connues / prochaines étapes
 
 - **Testé contre un vrai projet Supabase** (room, join, événements, heartbeat, exclusion,
-  upload de capture) — **pas encore contre un vrai déploiement Vercel**, à valider avant
+  upload de capture) — **pas encore contre un vrai déploiement Fly.io**, à valider avant
   mise en production.
 - **Exclusion par polling, pas push.** L'agent Windows découvre une exclusion décidée
   par le prof en interrogeant sa session toutes les 3 secondes — délai de quelques
