@@ -30,6 +30,7 @@ app.use(express.json({ limit: "10mb" })); // screenshots arrive as base64 JSON
 // via ts-node-dev on src/devServer.ts or as compiled dist/src/devServer.js —
 // both are started with the backend/ directory as the working directory.
 app.use("/", express.static(path.join(process.cwd(), "public")));
+app.get("/", (_req, res) => res.redirect("/dashboard.html"));
 
 function mount(route: string, handler: (req: VercelRequest, res: VercelResponse) => Promise<void>) {
   app.all(route, (req: Request, res: Response) => {
