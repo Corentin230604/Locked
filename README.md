@@ -68,8 +68,13 @@ le `fetch` natif de Node ne respecte pas `HTTPS_PROXY` par défaut : ajouter
 qu'un détail de dev local — **Vercel n'a pas ce problème**, il gère son propre réseau
 sortant.
 
-Dashboard intervenant : ouvrir `http://localhost:4000/dashboard.html`, renseigner l'URL
-de l'API, l'URL Supabase, la **clé anon** (pas la clé service_role !) et le code de room.
+**Espace intervenant** : ouvrir `http://localhost:4000/dashboard.html`. Trois champs de
+connexion à renseigner une fois (mémorisés ensuite) : URL de l'API, URL Supabase, **clé
+anon** (jamais la clé service_role !). Une fois connecté, deux actions possibles : créer
+une room avec sa configuration (titre, compte à rebours, captures d'écran), ou rejoindre
+une room déjà créée par son code — dans les deux cas ça amène au tableau de bord temps
+réel (étudiants connectés, journal d'événements, exclusion manuelle). Design épuré
+inspiré des interfaces Apple : typographie système, cartes arrondies, palette neutre.
 
 API principale (REST, sans WebSocket) :
 - `POST /api/rooms` `{ teacherName, config }` → crée une room, retourne son `code`
@@ -129,14 +134,19 @@ cd windows-agent/LockedAgent
 dotnet run
 ```
 
-Renseigner l'adresse du serveur (Fly.io ou localhost), le code de room, et un nom, puis
-"Rejoindre l'examen". Excel se lance en plein écran ; sortir de la fenêtre affiche
-l'overlay rouge avec compte à rebours configuré par l'intervenant. L'agent ne détient
-aucune clé Supabase — il ne parle qu'à l'API (`/api/...`), qui seule détient la clé
-`service_role`.
+C'est l'**espace étudiant** : renseigner l'adresse du serveur (Render ou localhost), le
+code de room, et un nom, puis "Rejoindre l'examen". Excel se lance en plein écran ;
+sortir de la fenêtre affiche l'overlay rouge avec compte à rebours configuré par
+l'intervenant. L'agent ne détient aucune clé Supabase — il ne parle qu'à l'API
+(`/api/...`), qui seule détient la clé `service_role`. Même palette visuelle que le
+dashboard web (fenêtre de connexion redessinée), non vérifiable visuellement dans cet
+environnement de développement faute de Windows.
 
 ## Ce qui est implémenté
 
+- **Deux espaces distincts** : l'agent Windows (espace étudiant) et le dashboard web
+  (espace intervenant, création de room + monitoring temps réel), avec un design
+  cohérent entre les deux.
 - Création de room avec configuration (titre, durée du compte à rebours, fréquence et
   mode fixe/aléatoire des captures d'écran)
 - Détection de perte de focus (`SetWinEventHook`) → overlay rouge plein écran avec
