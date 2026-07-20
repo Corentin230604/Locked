@@ -23,5 +23,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     sessionId: result.session.id,
     roomId: result.room.id,
     config: result.room.config,
+    lifecycle: result.room.lifecycle,
+    examFileAvailable: Boolean(result.room.examFilePath),
   });
 }

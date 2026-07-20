@@ -1,9 +1,14 @@
 import type { VercelRequest, VercelResponse } from "../src/lib/httpTypes";
-import { getSession } from "../src/lib/roomService";
+import { getRoomById, getSession } from "../src/lib/roomService";
 
-/** Polled by the Windows agent every few seconds to detect a teacher-triggered
- * exclusion (see api/exclude.ts) — no direct server-to-agent push exists once
- * Socket.IO is out of the picture, so the agent watches its own session row. */
+/**
+ * Polled by the Windows agent every few seconds. Carries everything the
+ * agent needs to react to server-side state changes without a push channel:
+ * its own status (to detect a teacher-triggered exclusion, see
+ * api/exclude.ts) and the room's lifecycle (to detect the waiting -> started
+ * transition and the started -> ended transition, see api/start.ts and
+ * api/end.ts).
+ */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "GET") {
     res.status(405).json({ error: "method not allowed" });
@@ -21,6 +26,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(404).json({ error: "session not found" });
     return;
   }
+  const room = await getRoomById(session.roomId);
 
-  res.status(200).json(session);
+  res.status(200).json({
+    ...session,
+    room: room ? { lifecycle: room.lifecycle, examFileAvailable: Boolean(room.examFilePath) } : null,
+  });
 }

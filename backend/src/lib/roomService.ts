@@ -2,9 +2,10 @@ import { supabaseAdmin } from "./supabaseAdmin";
 
 export interface ScreenshotConfig {
   enabled: boolean;
-  intervalMode: "fixed" | "random";
-  intervalSeconds: number;
-  jitterSeconds: number;
+  /** 1-60: how many captures to take per minute, at random moments within
+   * each 60-second window (not evenly spaced) — see screenshotAnalyzer.ts's
+   * caller in the Windows agent for the scheduling logic. */
+  perMinute: number;
 }
 
 export interface RoomConfig {
@@ -13,12 +14,22 @@ export interface RoomConfig {
   screenshot: ScreenshotConfig;
 }
 
+/** Derived from scheduled_start_at / started_at / ended_at — never stored
+ * directly, always recomputed from the raw timestamps so a scheduled start
+ * time doesn't need a cron job to "flip" anything. */
+export type RoomLifecycle = "waiting" | "started" | "ended";
+
 export interface Room {
   id: string;
   code: string;
   teacherName: string;
   config: RoomConfig;
   status: "open" | "closed";
+  lifecycle: RoomLifecycle;
+  scheduledStartAt: string | null;
+  startedAt: string | null;
+  endedAt: string | null;
+  examFilePath: string | null;
   createdAt: string;
 }
 
@@ -31,6 +42,7 @@ export interface Session {
   status: SessionStatus;
   joinedAt: string;
   lastSeen: string;
+  submissionPath: string | null;
 }
 
 export type ViolationType =
@@ -40,6 +52,7 @@ export type ViolationType =
   | "screenshot"
   | "ai_flag"
   | "joined"
+  | "submitted"
   | "disconnected";
 
 const ROOM_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0/O/1/I
@@ -52,21 +65,33 @@ function generateRoomCode(length = 6): string {
   return code;
 }
 
+function computeLifecycle(row: any): RoomLifecycle {
+  if (row.ended_at) return "ended";
+  if (row.started_at) return "started";
+  if (row.scheduled_start_at && new Date(row.scheduled_start_at).getTime() <= Date.now()) {
+    return "started";
+  }
+  return "waiting";
+}
+
 function toRoom(row: any): Room {
   return {
     id: row.id,
     code: row.code,
     teacherName: row.teacher_name,
     status: row.status,
+    lifecycle: computeLifecycle(row),
+    scheduledStartAt: row.scheduled_start_at,
+    startedAt: row.started_at,
+    endedAt: row.ended_at,
+    examFilePath: row.exam_file_path,
     createdAt: row.created_at,
     config: {
       examTitle: row.exam_title,
       countdownSeconds: row.countdown_seconds,
       screenshot: {
         enabled: row.screenshot_enabled,
-        intervalMode: row.screenshot_interval_mode,
-        intervalSeconds: row.screenshot_interval_seconds,
-        jitterSeconds: row.screenshot_jitter_seconds,
+        perMinute: row.screenshot_per_minute,
       },
     },
   };
@@ -80,21 +105,21 @@ function toSession(row: any): Session {
     status: row.status,
     joinedAt: row.joined_at,
     lastSeen: row.last_seen,
+    submissionPath: row.submission_path,
   };
 }
 
 export async function createRoom(
   teacherName: string,
-  partialConfig: Partial<RoomConfig> = {}
+  partialConfig: Partial<RoomConfig> = {},
+  scheduledStartAt?: string
 ): Promise<Room> {
   const config: RoomConfig = {
     examTitle: partialConfig.examTitle ?? "Examen",
     countdownSeconds: partialConfig.countdownSeconds ?? 15,
     screenshot: {
       enabled: partialConfig.screenshot?.enabled ?? true,
-      intervalMode: partialConfig.screenshot?.intervalMode ?? "random",
-      intervalSeconds: partialConfig.screenshot?.intervalSeconds ?? 20,
-      jitterSeconds: partialConfig.screenshot?.jitterSeconds ?? 5,
+      perMinute: clamp(partialConfig.screenshot?.perMinute ?? 10, 1, 60),
     },
   };
 
@@ -109,9 +134,8 @@ export async function createRoom(
         exam_title: config.examTitle,
         countdown_seconds: config.countdownSeconds,
         screenshot_enabled: config.screenshot.enabled,
-        screenshot_interval_mode: config.screenshot.intervalMode,
-        screenshot_interval_seconds: config.screenshot.intervalSeconds,
-        screenshot_jitter_seconds: config.screenshot.jitterSeconds,
+        screenshot_per_minute: config.screenshot.perMinute,
+        scheduled_start_at: scheduledStartAt ?? null,
       })
       .select()
       .single();
@@ -122,12 +146,22 @@ export async function createRoom(
   throw new Error("Could not generate a unique room code after 5 attempts.");
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
 export async function getRoomByCode(code: string): Promise<Room | null> {
   const { data, error } = await supabaseAdmin
     .from("rooms")
     .select()
     .eq("code", code.toUpperCase())
     .maybeSingle();
+  if (error) throw error;
+  return data ? toRoom(data) : null;
+}
+
+export async function getRoomById(roomId: string): Promise<Room | null> {
+  const { data, error } = await supabaseAdmin.from("rooms").select().eq("id", roomId).maybeSingle();
   if (error) throw error;
   return data ? toRoom(data) : null;
 }
@@ -205,7 +239,7 @@ export async function recordViolation(
   return { id: data.id, createdAt: data.created_at };
 }
 
-/** Teacher-triggered exclusion from the dashboard. */
+/** Teacher-triggered exclusion from the dashboard "Exclure" button. */
 export async function excludeSession(sessionId: string): Promise<Session | null> {
   const session = await getSession(sessionId);
   if (!session) return null;
@@ -214,4 +248,46 @@ export async function excludeSession(sessionId: string): Promise<Session | null>
     reason: "manual_teacher_action",
   });
   return session;
+}
+
+/** Teacher clicks "Démarrer l'examen" — flips every waiting student straight
+ * to fullscreen + full monitoring on their next poll (see api/session.ts). */
+export async function startRoom(roomId: string): Promise<Room | null> {
+  const { data, error } = await supabaseAdmin
+    .from("rooms")
+    .update({ started_at: new Date().toISOString() })
+    .eq("id", roomId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data ? toRoom(data) : null;
+}
+
+/** Teacher clicks "Terminer l'examen" — closes the room to new joins and
+ * signals every agent (via polling) to save and submit its workbook. */
+export async function endRoom(roomId: string): Promise<Room | null> {
+  const { data, error } = await supabaseAdmin
+    .from("rooms")
+    .update({ ended_at: new Date().toISOString(), status: "closed" })
+    .eq("id", roomId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data ? toRoom(data) : null;
+}
+
+export async function setExamFile(roomId: string, path: string): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from("rooms")
+    .update({ exam_file_path: path })
+    .eq("id", roomId);
+  if (error) throw error;
+}
+
+export async function setSubmissionPath(sessionId: string, path: string): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from("sessions")
+    .update({ submission_path: path })
+    .eq("id", sessionId);
+  if (error) throw error;
 }
