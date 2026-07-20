@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Locked</title>
+<style>
+  :root {
+    --bg: #f5f5f7;
+    --card: #ffffff;
+    --text: #1d1d1f;
+    --text-secondary: #6e6e73;
+    --border: rgba(0, 0, 0, 0.07);
+    --shadow: 0 2px 10px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.03);
+    --accent: #0071e3;
+    --accent-hover: #0077ed;
+    --radius-lg: 20px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+  .app { max-width: 760px; width: 100%; padding: 2.5rem 1.5rem; text-align: center; }
+  h1 { font-size: 2.75rem; font-weight: 600; letter-spacing: -0.02em; margin: 0 0 0.4rem; }
+  .subtitle { color: var(--text-secondary); font-size: 1.1rem; margin: 0 0 2.5rem; }
+  .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+  @media (max-width: 620px) { .choices { grid-template-columns: 1fr; } }
+  a.choice {
+    display: block;
+    background: var(--card);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    padding: 2.25rem 1.5rem;
+    text-decoration: none;
+    color: var(--text);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+  }
+  a.choice:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08); }
+  a.choice .icon { font-size: 2.25rem; margin-bottom: 0.75rem; }
+  a.choice .label { font-size: 1.2rem; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 0.35rem; }
+  a.choice .desc { font-size: 0.9rem; color: var(--text-secondary); }
+  a.choice.accent .label { color: var(--accent); }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #000000;
+      --card: #1c1c1e;
+      --text: #f5f5f7;
+      --text-secondary: #9a9a9e;
+      --border: rgba(255, 255, 255, 0.09);
+      --shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+    }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>Locked</h1>
+  <p class="subtitle">Examens Excel en conditions surveillées</p>
+  <div class="choices">
+    <a class="choice accent" href="dashboard.html">
+      <div class="icon">🧑‍🏫</div>
+      <div class="label">Intervenant</div>
+      <div class="desc">Créer et piloter une room d'examen</div>
+    </a>
+    <a class="choice" href="student.html">
+      <div class="icon">🎓</div>
+      <div class="label">Élève</div>
+      <div class="desc">Rejoindre un examen avec un code</div>
+    </a>
+  </div>
+</div>
+</body>
+</html>

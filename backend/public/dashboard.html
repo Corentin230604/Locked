@@ -39,7 +39,10 @@
 
   .app { max-width: 960px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
 
-  header.hero { text-align: center; margin-bottom: 2.5rem; }
+  a.back { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }
+  a.back:hover { color: var(--text); }
+
+  header.hero { text-align: center; margin: 1.25rem 0 2.5rem; }
   header.hero h1 { font-size: 2.25rem; font-weight: 600; letter-spacing: -0.02em; margin: 0 0 0.25rem; }
   header.hero p { color: var(--text-secondary); font-size: 1.05rem; margin: 0; }
 
@@ -76,6 +79,10 @@
 
   .row { display: flex; gap: 0.75rem; }
   .row > * { flex: 1; }
+
+  .checkbox-row { display: flex; align-items: center; gap: 0.5rem; margin: 0.9rem 0 0; }
+  .checkbox-row input { width: auto; }
+  .checkbox-row label { margin: 0; }
 
   button {
     font-family: inherit;
@@ -119,11 +126,19 @@
   }
   .room-title { color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.15rem; }
   .copy-btn { font-size: 0.8rem; padding: 0.35rem 0.75rem; }
+  .room-actions { display: flex; align-items: center; gap: 0.75rem; }
+
+  .lifecycle-badge {
+    font-size: 0.75rem; font-weight: 600; padding: 0.25rem 0.7rem; border-radius: var(--radius-pill);
+  }
+  .lifecycle-badge.waiting { color: var(--warning); background: var(--warning-bg); }
+  .lifecycle-badge.started { color: var(--success); background: var(--success-bg); }
+  .lifecycle-badge.ended { color: var(--text-secondary); background: rgba(0, 0, 0, 0.05); }
 
   .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-top: 1.25rem; }
   @media (max-width: 720px) { .dashboard-grid { grid-template-columns: 1fr; } }
 
-  .student {
+  .student, .submission {
     display: flex; justify-content: space-between; align-items: center;
     padding: 0.65rem 0.9rem; border-radius: var(--radius-sm); margin-bottom: 0.5rem;
     background: #fbfbfd; border: 1px solid var(--border);
@@ -142,11 +157,16 @@
   .event .type { font-weight: 600; padding: 0.1rem 0.5rem; border-radius: var(--radius-pill); font-size: 0.72rem; margin-right: 0.4rem; }
   .event .time { color: var(--text-secondary); font-size: 0.78rem; }
   .type-focus_lost, .type-excluded { color: var(--danger); background: var(--danger-bg); }
-  .type-focus_returned, .type-joined { color: var(--success); background: var(--success-bg); }
+  .type-focus_returned, .type-joined, .type-submitted { color: var(--success); background: var(--success-bg); }
   .type-screenshot { color: var(--info); background: #e8f2fd; }
   .type-ai_flag, .type-disconnected { color: var(--warning); background: var(--warning-bg); }
 
   .status-line { font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.75rem; min-height: 1.2em; }
+
+  .submissions-card { margin-top: 1.25rem; }
+  .submission a { color: var(--accent); text-decoration: none; font-size: 0.85rem; font-weight: 500; }
+  .submission a:hover { text-decoration: underline; }
+  .submission .pending { color: var(--text-secondary); font-size: 0.85rem; }
 
   @media (prefers-color-scheme: dark) {
     :root {
@@ -160,12 +180,13 @@
     input, select { background: #2c2c2e; color: var(--text); }
     button.secondary { background: rgba(255, 255, 255, 0.08); color: var(--text); }
     button.secondary:hover { background: rgba(255, 255, 255, 0.13); }
-    .student { background: #2c2c2e; }
+    .student, .submission { background: #2c2c2e; }
   }
 </style>
 </head>
 <body>
 <div class="app">
+  <a class="back" href="index.html">← Accueil</a>
   <header class="hero">
     <h1>Locked</h1>
     <p>Espace intervenant</p>
@@ -197,29 +218,28 @@
       <input id="teacherName" placeholder="M. Dupont" />
       <label for="examTitle">Intitulé de l'examen</label>
       <input id="examTitle" placeholder="DS Excel" />
+
+      <label for="examFile">Fichier Excel à distribuer (optionnel)</label>
+      <input id="examFile" type="file" accept=".xlsx,.xls,.xlsm" />
+
       <div class="row">
         <div>
           <label for="countdownSeconds">Compte à rebours (s)</label>
           <input id="countdownSeconds" type="number" min="5" value="15" />
         </div>
         <div>
-          <label for="intervalMode">Captures d'écran</label>
-          <select id="intervalMode">
-            <option value="random">Intervalle aléatoire</option>
-            <option value="fixed">Intervalle fixe</option>
-          </select>
+          <label for="scheduledStartAt">Démarrage programmé (optionnel)</label>
+          <input id="scheduledStartAt" type="datetime-local" />
         </div>
       </div>
-      <div class="row">
-        <div>
-          <label for="intervalSeconds">Toutes les (s)</label>
-          <input id="intervalSeconds" type="number" min="3" value="20" />
-        </div>
-        <div>
-          <label for="jitterSeconds">± (s, si aléatoire)</label>
-          <input id="jitterSeconds" type="number" min="0" value="5" />
-        </div>
+
+      <label for="screenshotPerMinute">Système IA — captures par minute (1-60)</label>
+      <input id="screenshotPerMinute" type="number" min="1" max="60" value="10" />
+      <div class="checkbox-row">
+        <input id="aiEnabled" type="checkbox" checked />
+        <label for="aiEnabled">Activer l'analyse IA des captures</label>
       </div>
+
       <div style="margin-top: 1.25rem;">
         <button class="primary" id="createRoomBtn">Créer la room</button>
       </div>
@@ -241,10 +261,15 @@
         <div class="room-code-block">
           <span class="room-code" id="roomCodeDisplay"></span>
           <button class="secondary copy-btn" id="copyCodeBtn">Copier</button>
+          <span class="lifecycle-badge" id="lifecycleBadge"></span>
         </div>
         <div class="room-title" id="roomTitleDisplay"></div>
       </div>
-      <button class="secondary" id="backBtn">← Nouvelle room</button>
+      <div class="room-actions">
+        <button class="primary hidden" id="startExamBtn">Démarrer l'examen</button>
+        <button class="danger hidden" id="endExamBtn">Terminer l'examen</button>
+        <button class="secondary" id="backBtn">← Nouvelle room</button>
+      </div>
     </div>
 
     <div class="dashboard-grid">
@@ -257,6 +282,11 @@
         <div id="events"><p class="empty-state">Aucun événement pour le moment.</p></div>
       </div>
     </div>
+
+    <div class="card submissions-card hidden" id="submissionsCard">
+      <h3>Copies rendues</h3>
+      <div id="submissions"><p class="empty-state">En attente des copies...</p></div>
+    </div>
   </section>
 
   <p class="status-line" id="status"></p>
@@ -268,6 +298,8 @@
   const statusEl = $("status");
   const students = new Map(); // sessionId -> session row
   let currentRoom = null;
+  let submissionsPollTimer = null;
+  let lifecycleTimer = null;
 
   // --- Config (persisted) ---
   function loadConfig() {
@@ -318,6 +350,15 @@
     $("configSummary").classList.add("hidden");
   });
 
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(",")[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
   // --- Room creation / join ---
   $("createRoomBtn").addEventListener("click", async () => {
     const cfg = loadConfig();
@@ -326,27 +367,43 @@
       statusEl.textContent = "Renseigne ton nom.";
       return;
     }
+    const perMinute = Math.min(60, Math.max(1, Number($("screenshotPerMinute").value) || 10));
     const config = {
       examTitle: $("examTitle").value.trim() || "Examen",
       countdownSeconds: Number($("countdownSeconds").value) || 15,
       screenshot: {
-        enabled: true,
-        intervalMode: $("intervalMode").value,
-        intervalSeconds: Number($("intervalSeconds").value) || 20,
-        jitterSeconds: Number($("jitterSeconds").value) || 5,
+        enabled: $("aiEnabled").checked,
+        perMinute,
       },
     };
+    const scheduledStartAtLocal = $("scheduledStartAt").value;
+    const scheduledStartAt = scheduledStartAtLocal ? new Date(scheduledStartAtLocal).toISOString() : undefined;
+
     statusEl.textContent = "Création de la room...";
     try {
       const res = await fetch(`${cfg.apiUrl}/api/rooms`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teacherName, config }),
+        body: JSON.stringify({ teacherName, config, scheduledStartAt }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const room = await res.json();
+
+      const file = $("examFile").files[0];
+      if (file) {
+        statusEl.textContent = "Envoi du fichier Excel...";
+        const fileBase64 = await fileToBase64(file);
+        const uploadRes = await fetch(`${cfg.apiUrl}/api/exam-file`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ roomId: room.id, fileBase64, filename: file.name }),
+        });
+        if (!uploadRes.ok) throw new Error(`Envoi du fichier échoué (${uploadRes.status})`);
+        room.examFilePath = `${room.id}/${file.name}`;
+      }
+
       statusEl.textContent = "";
-      openDashboard({ id: room.roomId, code: room.code, config: room.config }, []);
+      openDashboard(room, []);
     } catch (err) {
       statusEl.textContent = `Impossible de créer la room (${err.message}). Le serveur met peut-être quelques secondes à se réveiller — réessaie.`;
     }
@@ -374,6 +431,8 @@
   $("backBtn").addEventListener("click", () => {
     currentRoom = null;
     students.clear();
+    stopLifecycleTimer();
+    stopSubmissionsPolling();
     $("dashboardSection").classList.add("hidden");
     $("launchSection").classList.remove("hidden");
     statusEl.textContent = "";
@@ -386,6 +445,40 @@
     const original = btn.textContent;
     btn.textContent = "Copié !";
     setTimeout(() => (btn.textContent = original), 1500);
+  });
+
+  $("startExamBtn").addEventListener("click", async () => {
+    if (!currentRoom) return;
+    const cfg = loadConfig();
+    $("startExamBtn").disabled = true;
+    try {
+      await fetch(`${cfg.apiUrl}/api/start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomId: currentRoom.id }),
+      });
+      currentRoom.startedAt = new Date().toISOString();
+      renderRoomState();
+    } finally {
+      $("startExamBtn").disabled = false;
+    }
+  });
+
+  $("endExamBtn").addEventListener("click", async () => {
+    if (!currentRoom) return;
+    const cfg = loadConfig();
+    $("endExamBtn").disabled = true;
+    try {
+      await fetch(`${cfg.apiUrl}/api/end`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomId: currentRoom.id }),
+      });
+      currentRoom.endedAt = new Date().toISOString();
+      renderRoomState();
+    } finally {
+      $("endExamBtn").disabled = false;
+    }
   });
 
   // --- Dashboard rendering ---
@@ -445,32 +538,138 @@
     };
   }
 
+  // Mirrors roomService.ts's computeLifecycle(): derived from the raw
+  // timestamps, never stored directly, so a scheduled start flips the
+  // dashboard's own state on a timer rather than needing a Realtime push
+  // (no DB write happens purely because a clock passed scheduled_start_at).
+  function computeLifecycle(scheduledStartAt, startedAt, endedAt) {
+    if (endedAt) return "ended";
+    if (startedAt) return "started";
+    if (scheduledStartAt && new Date(scheduledStartAt).getTime() <= Date.now()) return "started";
+    return "waiting";
+  }
+
+  function normalizeRoom(r) {
+    const scheduledStartAt = r.scheduled_start_at ?? r.scheduledStartAt ?? null;
+    const startedAt = r.started_at ?? r.startedAt ?? null;
+    const endedAt = r.ended_at ?? r.endedAt ?? null;
+    return {
+      id: r.id,
+      code: r.code,
+      status: r.status,
+      scheduledStartAt,
+      startedAt,
+      endedAt,
+      examFilePath: r.exam_file_path ?? r.examFilePath ?? null,
+      config: r.config ?? {
+        examTitle: r.exam_title,
+        countdownSeconds: r.countdown_seconds,
+        screenshot: { enabled: r.screenshot_enabled, perMinute: r.screenshot_per_minute },
+      },
+    };
+  }
+
+  function renderRoomState() {
+    if (!currentRoom) return;
+    const lifecycle = computeLifecycle(currentRoom.scheduledStartAt, currentRoom.startedAt, currentRoom.endedAt);
+
+    const badge = $("lifecycleBadge");
+    badge.className = `lifecycle-badge ${lifecycle}`;
+    badge.textContent = { waiting: "En attente", started: "En cours", ended: "Terminé" }[lifecycle];
+
+    $("startExamBtn").classList.toggle("hidden", lifecycle !== "waiting");
+    $("endExamBtn").classList.toggle("hidden", lifecycle !== "started");
+
+    const cfg = currentRoom.config;
+    const aiText = cfg.screenshot.enabled ? `IA activée (${cfg.screenshot.perMinute} captures/min)` : "IA désactivée";
+    const scheduleText = currentRoom.scheduledStartAt && lifecycle === "waiting"
+      ? ` — démarrage prévu à ${new Date(currentRoom.scheduledStartAt).toLocaleString()}`
+      : "";
+    $("roomTitleDisplay").textContent = cfg
+      ? `${cfg.examTitle} — compte à rebours ${cfg.countdownSeconds}s — ${aiText}${scheduleText}`
+      : "";
+
+    $("submissionsCard").classList.toggle("hidden", lifecycle !== "ended");
+    if (lifecycle === "ended") {
+      loadSubmissions();
+      startSubmissionsPolling();
+    } else {
+      stopSubmissionsPolling();
+    }
+  }
+
+  function startLifecycleTimer() {
+    stopLifecycleTimer();
+    lifecycleTimer = setInterval(renderRoomState, 5000);
+  }
+  function stopLifecycleTimer() {
+    if (lifecycleTimer) clearInterval(lifecycleTimer);
+    lifecycleTimer = null;
+  }
+
+  function renderSubmissions(list) {
+    const el = $("submissions");
+    if (!list || list.length === 0) {
+      el.innerHTML = '<p class="empty-state">Aucune copie reçue pour le moment.</p>';
+      return;
+    }
+    el.innerHTML = "";
+    for (const s of list) {
+      const div = document.createElement("div");
+      div.className = "submission";
+      div.innerHTML = s.url
+        ? `<span>${s.studentName}</span><a href="${s.url}" target="_blank" rel="noopener">Télécharger</a>`
+        : `<span>${s.studentName}</span><span class="pending">en attente...</span>`;
+      el.appendChild(div);
+    }
+  }
+
+  async function loadSubmissions() {
+    if (!currentRoom) return;
+    const cfg = loadConfig();
+    try {
+      const res = await fetch(`${cfg.apiUrl}/api/submission?code=${encodeURIComponent(currentRoom.code)}`);
+      if (!res.ok) return;
+      const { submissions } = await res.json();
+      renderSubmissions(submissions);
+    } catch {
+      // best-effort — the next poll will retry
+    }
+  }
+
+  function startSubmissionsPolling() {
+    if (submissionsPollTimer) return;
+    submissionsPollTimer = setInterval(loadSubmissions, 5000);
+  }
+  function stopSubmissionsPolling() {
+    if (submissionsPollTimer) clearInterval(submissionsPollTimer);
+    submissionsPollTimer = null;
+  }
+
   function openDashboard(room, sessions) {
-    currentRoom = room;
+    currentRoom = normalizeRoom(room);
     students.clear();
     for (const s of sessions) {
       const normalized = normalizeSession(s);
       students.set(normalized.id, normalized);
     }
 
-    $("roomCodeDisplay").textContent = room.code;
-    const cfg = room.config;
-    $("roomTitleDisplay").textContent = cfg
-      ? `${cfg.examTitle} — compte à rebours ${cfg.countdownSeconds}s, captures ${cfg.screenshot.intervalMode === "random" ? "aléatoires" : "fixes"} (${cfg.screenshot.intervalSeconds}s)`
-      : "";
+    $("roomCodeDisplay").textContent = currentRoom.code;
 
     $("launchSection").classList.add("hidden");
     $("dashboardSection").classList.remove("hidden");
     renderStudents();
+    renderRoomState();
+    startLifecycleTimer();
     $("events").innerHTML = '<p class="empty-state">Aucun événement pour le moment.</p>';
 
     const { supabaseUrl, supabaseAnonKey } = loadConfig();
     const client = supabase.createClient(supabaseUrl, supabaseAnonKey);
     client
-      .channel(`room-${room.id}`)
+      .channel(`room-${currentRoom.id}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "sessions", filter: `room_id=eq.${room.id}` },
+        { event: "*", schema: "public", table: "sessions", filter: `room_id=eq.${currentRoom.id}` },
         (payload) => {
           const row = payload.new;
           if (!row?.id) return;
@@ -480,11 +679,19 @@
       )
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "violations", filter: `room_id=eq.${room.id}` },
+        { event: "INSERT", schema: "public", table: "violations", filter: `room_id=eq.${currentRoom.id}` },
         (payload) => logEvent(payload.new)
       )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "rooms", filter: `id=eq.${currentRoom.id}` },
+        (payload) => {
+          currentRoom = normalizeRoom(payload.new);
+          renderRoomState();
+        }
+      )
       .subscribe((status) => {
-        statusEl.textContent = status === "SUBSCRIBED" ? `Connecté en direct à ${room.code}` : "";
+        statusEl.textContent = status === "SUBSCRIBED" ? `Connecté en direct à ${currentRoom.code}` : "";
       });
   }
 
