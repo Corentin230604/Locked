@@ -6,9 +6,10 @@ using System.Net.Http.Json;
 namespace LockedAgent;
 
 /// <summary>
-/// Captures the screen on the interval the teacher configured for the room (fixed
-/// or randomly jittered) and uploads each frame to the backend as base64 JSON.
-/// Upload failures are swallowed on purpose: a flaky network shouldn't crash the
+/// Captures the screen the teacher's configured number of times per minute
+/// (1-60), at random moments within each 60-second window rather than fixed
+/// intervals, and uploads each frame to the backend as base64 JSON. Upload
+/// failures are swallowed on purpose: a flaky network shouldn't crash the
 /// agent mid-exam.
 /// </summary>
 public sealed class ScreenshotService : IDisposable
@@ -18,7 +19,8 @@ public sealed class ScreenshotService : IDisposable
     private readonly string _sessionId;
     private readonly ScreenshotConfig _config;
     private readonly Random _random = new();
-    private Timer? _timer;
+    private readonly CancellationTokenSource _cts = new();
+    private Task? _loopTask;
 
     public ScreenshotService(HttpClient http, string baseUrl, string sessionId, ScreenshotConfig config)
     {
@@ -31,20 +33,37 @@ public sealed class ScreenshotService : IDisposable
     public void Start()
     {
         if (!_config.Enabled) return;
-        ScheduleNext();
+        _loopTask = RunAsync(_cts.Token);
     }
 
-    private void ScheduleNext()
+    private async Task RunAsync(CancellationToken token)
     {
-        int seconds = _config.IntervalMode == "random"
-            ? Math.Max(1, _config.IntervalSeconds + _random.Next(-_config.JitterSeconds, _config.JitterSeconds + 1))
-            : _config.IntervalSeconds;
-
-        _timer = new Timer(async _ =>
+        try
         {
-            await CaptureAndUploadAsync();
-            ScheduleNext();
-        }, null, TimeSpan.FromSeconds(seconds), Timeout.InfiniteTimeSpan);
+            while (!token.IsCancellationRequested)
+            {
+                var windowStart = DateTime.UtcNow;
+
+                var offsetsMs = new List<int>(_config.PerMinute);
+                for (int i = 0; i < _config.PerMinute; i++)
+                    offsetsMs.Add(_random.Next(0, 60_000));
+                offsetsMs.Sort();
+
+                foreach (var offsetMs in offsetsMs)
+                {
+                    var delay = windowStart.AddMilliseconds(offsetMs) - DateTime.UtcNow;
+                    if (delay > TimeSpan.Zero) await Task.Delay(delay, token);
+                    await CaptureAndUploadAsync();
+                }
+
+                var remaining = TimeSpan.FromSeconds(60) - (DateTime.UtcNow - windowStart);
+                if (remaining > TimeSpan.Zero) await Task.Delay(remaining, token);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Stopped by Dispose — expected when the exam ends or the student is excluded.
+        }
     }
 
     private async Task CaptureAndUploadAsync()
@@ -78,5 +97,9 @@ public sealed class ScreenshotService : IDisposable
         return bitmap;
     }
 
-    public void Dispose() => _timer?.Dispose();
+    public void Dispose()
+    {
+        _cts.Cancel();
+        _cts.Dispose();
+    }
 }

@@ -13,6 +13,8 @@
   <ItemGroup>
     <!-- Graphics.CopyFromScreen for periodic screenshot capture. -->
     <PackageReference Include="System.Drawing.Common" Version="8.0.8" />
+    <!-- `dynamic` late-bound COM calls in ExcelLauncher.cs (no PIA needed). -->
+    <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
   </ItemGroup>
 
 </Project>

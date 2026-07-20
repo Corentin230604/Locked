@@ -1,3 +1,4 @@
+using System.IO;
 using System.Net.Http;
 using System.Windows;
 using System.Windows.Threading;
@@ -5,9 +6,13 @@ using System.Windows.Threading;
 namespace LockedAgent;
 
 /// <summary>
-/// Orchestrates one exam session end to end: connects to the room's realtime
-/// channel, locks Excel to the foreground, and wires the focus watcher / keyboard
-/// hook / screenshot capture to the events the backend and teacher dashboard expect.
+/// Orchestrates one exam session end to end. While the room is "waiting",
+/// Excel is open in the background, unlocked, with no surveillance armed. The
+/// moment the teacher starts the room — or immediately, if this student joins
+/// after it has already started — every surveillance system arms at once:
+/// fullscreen lockdown, focus watcher, keyboard hook, and periodic
+/// screenshots. When the teacher ends the room, everything disarms and the
+/// workbook is saved and uploaded automatically.
 /// </summary>
 public sealed class ExamSession
 {
@@ -16,11 +21,14 @@ public sealed class ExamSession
     private readonly HttpClient _http = new();
 
     private BackendClient? _backend;
+    private ExcelLauncher? _launcher;
     private FocusWatcher? _focusWatcher;
     private KeyboardHook? _keyboardHook;
     private ScreenshotService? _screenshotService;
     private OverlayWindow? _overlay;
+    private WaitingWindow? _waitingWindow;
     private DispatcherTimer? _heartbeatTimer;
+    private bool _locked;
 
     public ExamSession(string baseUrl, JoinResponse join)
     {
@@ -28,15 +36,58 @@ public sealed class ExamSession
         _join = join;
     }
 
-    public Task StartAsync()
+    public async Task StartAsync()
     {
-        _backend = new BackendClient(_http, _baseUrl, _join.SessionId);
+        _backend = new BackendClient(_http, _baseUrl, _join.SessionId, _join.Lifecycle);
         _backend.Excluded += () => Application.Current.Dispatcher.Invoke(Exclude);
-        _backend.StartPollingForExclusion();
+        _backend.RoomStarted += () => Application.Current.Dispatcher.Invoke(LockDown);
+        _backend.RoomEnded += () => Application.Current.Dispatcher.Invoke(() => _ = EndExamAsync());
+        _backend.StartPolling();
 
-        var excelProcess = new ExcelLauncher().Launch();
+        string? examFilePath = null;
+        if (_join.ExamFileAvailable)
+        {
+            var bytes = await _backend.DownloadExamFileAsync();
+            if (bytes is not null)
+            {
+                examFilePath = Path.Combine(Path.GetTempPath(), $"locked-exam-{Guid.NewGuid():N}.xlsx");
+                await File.WriteAllBytesAsync(examFilePath, bytes);
+            }
+        }
 
-        _focusWatcher = new FocusWatcher(excelProcess.Id);
+        _launcher = new ExcelLauncher();
+        _launcher.Launch(examFilePath);
+
+        _heartbeatTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(15) };
+        _heartbeatTimer.Tick += async (_, _) => await _backend.SendHeartbeatAsync();
+        _heartbeatTimer.Start();
+
+        if (_join.Lifecycle == "started")
+        {
+            LockDown();
+        }
+        else
+        {
+            _waitingWindow = new WaitingWindow(_join.Config.ExamTitle);
+            _waitingWindow.Show();
+        }
+    }
+
+    /// <summary>Arms every surveillance system at once: fullscreen, focus
+    /// watcher, keyboard hook, screenshots. Idempotent — a late joiner calls
+    /// this from StartAsync directly, everyone else from the RoomStarted
+    /// event, never both.</summary>
+    private void LockDown()
+    {
+        if (_locked || _launcher is null) return;
+        _locked = true;
+
+        _waitingWindow?.Close();
+        _waitingWindow = null;
+
+        _launcher.EnterFullscreenLockdown();
+
+        _focusWatcher = new FocusWatcher(_launcher.ProcessId);
         _focusWatcher.FocusLost += OnFocusLost;
         _focusWatcher.FocusRestored += OnFocusRestored;
 
@@ -46,12 +97,6 @@ public sealed class ExamSession
         _screenshotService = new ScreenshotService(
             _http, _baseUrl, _join.SessionId, _join.Config.Screenshot);
         _screenshotService.Start();
-
-        _heartbeatTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(15) };
-        _heartbeatTimer.Tick += async (_, _) => await _backend.SendHeartbeatAsync();
-        _heartbeatTimer.Start();
-
-        return Task.CompletedTask;
     }
 
     private void OnFocusLost()
@@ -82,15 +127,50 @@ public sealed class ExamSession
         Exclude();
     }
 
+    /// <summary>Teacher clicked "Terminer l'examen": disarm everything, save
+    /// the workbook to a path we control, and upload it — see
+    /// api/submission.ts on the backend.</summary>
+    private async Task EndExamAsync()
+    {
+        Disarm();
+        try
+        {
+            if (_launcher is not null)
+            {
+                var bytes = _launcher.SaveAndReadBytes();
+                await _backend!.UploadSubmissionAsync(bytes, $"{_join.Config.ExamTitle}.xlsx");
+            }
+        }
+        catch
+        {
+            // Best-effort: the teacher's dashboard shows whichever submissions
+            // made it through; a save/upload failure shouldn't hang the agent.
+        }
+        finally
+        {
+            _launcher?.Dispose();
+            _ = _backend?.DisposeAsync();
+            Application.Current.Shutdown();
+        }
+    }
+
     private void Exclude()
+    {
+        Disarm();
+        _launcher?.Dispose();
+        _ = _backend?.DisposeAsync(); // app is shutting down right after; fire-and-forget is fine
+        // TODO: show a dedicated "vous avez été exclu" screen and terminate Excel
+        // gracefully before shutting down, instead of exiting the whole agent.
+        Application.Current.Shutdown();
+    }
+
+    private void Disarm()
     {
         _keyboardHook?.Dispose();
         _focusWatcher?.Dispose();
         _screenshotService?.Dispose();
         _heartbeatTimer?.Stop();
-        _ = _backend?.DisposeAsync(); // app is shutting down right after; fire-and-forget is fine
-        // TODO: show a dedicated "vous avez été exclu" screen and terminate Excel
-        // gracefully before shutting down, instead of exiting the whole agent.
-        Application.Current.Shutdown();
+        _overlay?.CancelCountdown();
+        _waitingWindow?.Close();
     }
 }

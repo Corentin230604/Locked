@@ -7,8 +7,8 @@ namespace LockedAgent;
 /// <summary>
 /// REST client for the Locked backend (Vercel functions + Supabase — no
 /// Socket.IO). There is no server-to-agent push channel in this architecture,
-/// so a teacher-triggered exclusion is discovered by polling this session's
-/// own row rather than receiving a pushed command.
+/// so exclusion and room lifecycle transitions (waiting -> started -> ended)
+/// are all discovered by polling this session's own row.
 /// </summary>
 public sealed class BackendClient : IAsyncDisposable
 {
@@ -20,14 +20,18 @@ public sealed class BackendClient : IAsyncDisposable
     private readonly string _sessionId;
     private readonly CancellationTokenSource _cts = new();
     private Task? _pollTask;
+    private string _lastLifecycle;
 
     public event Action? Excluded;
+    public event Action? RoomStarted;
+    public event Action? RoomEnded;
 
-    public BackendClient(HttpClient http, string baseUrl, string sessionId)
+    public BackendClient(HttpClient http, string baseUrl, string sessionId, string initialLifecycle)
     {
         _http = http;
         _baseUrl = baseUrl.TrimEnd('/');
         _sessionId = sessionId;
+        _lastLifecycle = initialLifecycle;
     }
 
     public Task SendEventAsync(string type, object? payload = null)
@@ -36,7 +40,34 @@ public sealed class BackendClient : IAsyncDisposable
     public Task SendHeartbeatAsync()
         => _http.PostAsJsonAsync($"{_baseUrl}/api/heartbeat", new { sessionId = _sessionId });
 
-    public void StartPollingForExclusion()
+    /// <summary>Downloads the exam file the teacher imported, if any, via a
+    /// short-lived signed URL — the agent never gets Storage credentials.</summary>
+    public async Task<byte[]?> DownloadExamFileAsync()
+    {
+        ExamFileResponse? info;
+        try
+        {
+            info = await _http.GetFromJsonAsync<ExamFileResponse>(
+                $"{_baseUrl}/api/exam-file?sessionId={_sessionId}", JsonOptions);
+        }
+        catch
+        {
+            return null;
+        }
+        if (info is null || string.IsNullOrEmpty(info.Url)) return null;
+        return await _http.GetByteArrayAsync(info.Url);
+    }
+
+    /// <summary>Uploads the student's saved workbook once the exam ends.</summary>
+    public Task UploadSubmissionAsync(byte[] fileBytes, string filename)
+        => _http.PostAsJsonAsync($"{_baseUrl}/api/submission", new
+        {
+            sessionId = _sessionId,
+            fileBase64 = Convert.ToBase64String(fileBytes),
+            filename,
+        });
+
+    public void StartPolling()
     {
         _pollTask = PollLoopAsync(_cts.Token);
     }
@@ -58,11 +89,29 @@ public sealed class BackendClient : IAsyncDisposable
                 {
                     continue; // transient network/server error — retry on the next tick
                 }
+                if (session is null) continue;
 
-                if (session?.Status == "excluded")
+                if (session.Status == "excluded")
                 {
                     Excluded?.Invoke();
                     return;
+                }
+
+                var lifecycle = session.Room?.Lifecycle ?? _lastLifecycle;
+                if (lifecycle != _lastLifecycle)
+                {
+                    var previous = _lastLifecycle;
+                    _lastLifecycle = lifecycle;
+
+                    if (lifecycle == "started" && previous == "waiting")
+                    {
+                        RoomStarted?.Invoke();
+                    }
+                    else if (lifecycle == "ended")
+                    {
+                        RoomEnded?.Invoke();
+                        return;
+                    }
                 }
             }
         }
@@ -80,10 +129,5 @@ public sealed class BackendClient : IAsyncDisposable
             try { await _pollTask; } catch (OperationCanceledException) { }
         }
         _cts.Dispose();
-    }
-
-    private sealed class SessionStatusResponse
-    {
-        public string Status { get; set; } = "";
     }
 }
