@@ -1,0 +1,45 @@
+name: Build Windows Agent
+
+on:
+  push:
+    branches: [main, "claude/**"]
+    paths:
+      - "windows-agent/**"
+      - ".github/workflows/build-agent.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      # Self-contained + single file: the student just double-clicks one .exe,
+      # no separate .NET runtime install required on their PC.
+      - name: Publish
+        run: >
+          dotnet publish windows-agent/LockedAgent/LockedAgent.csproj
+          -c Release -r win-x64 --self-contained true
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+          -o publish
+
+      - name: Publish GitHub Release (rolling "latest" build)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release delete agent-latest --yes --cleanup-tag || true
+          git tag -f agent-latest
+          git push -f origin agent-latest
+          gh release create agent-latest publish/LockedAgent.exe \
+            --title "Locked — Agent Windows (dernière version)" \
+            --notes "Build automatique depuis le commit ${{ github.sha }}."
