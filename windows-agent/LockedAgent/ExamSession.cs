@@ -27,6 +27,7 @@ public sealed class ExamSession
     private ScreenshotService? _screenshotService;
     private OverlayWindow? _overlay;
     private WaitingWindow? _waitingWindow;
+    private TestExitWindow? _testExitWindow;
     private DispatcherTimer? _heartbeatTimer;
     private bool _locked;
 
@@ -97,6 +98,25 @@ public sealed class ExamSession
         _screenshotService = new ScreenshotService(
             _http, _baseUrl, _join.SessionId, _join.Config.Screenshot);
         _screenshotService.Start();
+
+        if (_join.IsTest)
+        {
+            _testExitWindow = new TestExitWindow();
+            _testExitWindow.ExitRequested += () => Application.Current.Dispatcher.Invoke(ExitTestMode);
+            _testExitWindow.Show();
+        }
+    }
+
+    /// <summary>Tester clicked "Quitter le test": disarm everything exactly
+    /// like a real end-of-exam, but record a distinct event so this never
+    /// shows up as a real exclusion on the teacher's dashboard.</summary>
+    private void ExitTestMode()
+    {
+        Disarm();
+        _ = _backend!.SendEventAsync("test_exit");
+        _launcher?.Dispose();
+        _ = _backend?.DisposeAsync();
+        Application.Current.Shutdown();
     }
 
     private void OnFocusLost()
@@ -172,5 +192,7 @@ public sealed class ExamSession
         _heartbeatTimer?.Stop();
         _overlay?.CancelCountdown();
         _waitingWindow?.Close();
+        _testExitWindow?.Close();
+        _testExitWindow = null;
     }
 }

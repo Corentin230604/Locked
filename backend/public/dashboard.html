@@ -134,6 +134,7 @@
   .lifecycle-badge.waiting { color: var(--warning); background: var(--warning-bg); }
   .lifecycle-badge.started { color: var(--success); background: var(--success-bg); }
   .lifecycle-badge.ended { color: var(--text-secondary); background: rgba(0, 0, 0, 0.05); }
+  .lifecycle-badge.test { color: var(--warning); background: var(--warning-bg); border: 1px solid var(--warning); }
 
   .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-top: 1.25rem; }
   @media (max-width: 720px) { .dashboard-grid { grid-template-columns: 1fr; } }
@@ -149,6 +150,7 @@
   .badge.active { color: var(--success); background: var(--success-bg); }
   .badge.excluded { color: var(--danger); background: var(--danger-bg); }
   .badge.disconnected { color: var(--warning); background: var(--warning-bg); }
+  .badge.left { color: var(--text-secondary); background: rgba(0, 0, 0, 0.05); }
   .empty-state { color: var(--text-secondary); font-size: 0.9rem; padding: 0.5rem 0; }
 
   #events { max-height: 60vh; overflow-y: auto; }
@@ -160,6 +162,7 @@
   .type-focus_returned, .type-joined, .type-submitted { color: var(--success); background: var(--success-bg); }
   .type-screenshot { color: var(--info); background: #e8f2fd; }
   .type-ai_flag, .type-disconnected { color: var(--warning); background: var(--warning-bg); }
+  .type-test_exit { color: var(--text-secondary); background: rgba(0, 0, 0, 0.05); }
 
   .status-line { font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.75rem; min-height: 1.2em; }
 
@@ -239,6 +242,10 @@
         <input id="aiEnabled" type="checkbox" checked />
         <label for="aiEnabled">Activer l'analyse IA des captures</label>
       </div>
+      <div class="checkbox-row">
+        <input id="isTestRoom" type="checkbox" />
+        <label for="isTestRoom">Room de test (toutes les restrictions s'appliquent, mais un bouton "Quitter le test" reste disponible côté élève)</label>
+      </div>
 
       <div style="margin-top: 1.25rem;">
         <button class="primary" id="createRoomBtn">Créer la room</button>
@@ -262,6 +269,7 @@
           <span class="room-code" id="roomCodeDisplay"></span>
           <button class="secondary copy-btn" id="copyCodeBtn">Copier</button>
           <span class="lifecycle-badge" id="lifecycleBadge"></span>
+          <span class="lifecycle-badge test hidden" id="testBadge">TEST</span>
         </div>
         <div class="room-title" id="roomTitleDisplay"></div>
       </div>
@@ -394,7 +402,7 @@
       const res = await fetch(`${cfg.apiUrl}/api/rooms`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teacherName, config, scheduledStartAt }),
+        body: JSON.stringify({ teacherName, config, scheduledStartAt, isTest: $("isTestRoom").checked }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const room = await res.json();
@@ -571,6 +579,7 @@
       startedAt,
       endedAt,
       examFilePath: r.exam_file_path ?? r.examFilePath ?? null,
+      isTest: Boolean(r.is_test ?? r.isTest ?? false),
       config: r.config ?? {
         examTitle: r.exam_title,
         countdownSeconds: r.countdown_seconds,
@@ -586,6 +595,7 @@
     const badge = $("lifecycleBadge");
     badge.className = `lifecycle-badge ${lifecycle}`;
     badge.textContent = { waiting: "En attente", started: "En cours", ended: "Terminé" }[lifecycle];
+    $("testBadge").classList.toggle("hidden", !currentRoom.isTest);
 
     $("startExamBtn").classList.toggle("hidden", lifecycle !== "waiting");
     $("endExamBtn").classList.toggle("hidden", lifecycle !== "started");

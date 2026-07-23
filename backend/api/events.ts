@@ -11,6 +11,7 @@ const AGENT_EVENT_TYPES: ViolationType[] = [
   "focus_returned",
   "excluded",
   "disconnected",
+  "test_exit",
 ];
 
 /** Agent -> backend event relay (focus lost/returned, self-excluded on
@@ -39,6 +40,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await updateSessionStatus(sessionId, "excluded");
   } else if (type === "disconnected") {
     await updateSessionStatus(sessionId, "disconnected");
+  } else if (type === "test_exit") {
+    await updateSessionStatus(sessionId, "left");
   }
 
   const event = await recordViolation(sessionId, session.roomId, type, payload);

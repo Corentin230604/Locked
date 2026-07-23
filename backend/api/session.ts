@@ -30,6 +30,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   res.status(200).json({
     ...session,
-    room: room ? { lifecycle: room.lifecycle, examFileAvailable: Boolean(room.examFilePath) } : null,
+    room: room
+      ? { lifecycle: room.lifecycle, examFileAvailable: Boolean(room.examFilePath), isTest: room.isTest }
+      : null,
   });
 }

@@ -3,12 +3,17 @@ import { createRoom, getRoomByCode } from "../src/lib/roomService";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === "POST") {
-    const { teacherName, config, scheduledStartAt } = req.body ?? {};
+    const { teacherName, config, scheduledStartAt, isTest } = req.body ?? {};
     if (!teacherName) {
       res.status(400).json({ error: "teacherName is required" });
       return;
     }
-    const room = await createRoom(teacherName, config ?? {}, scheduledStartAt ?? undefined);
+    const room = await createRoom(
+      teacherName,
+      config ?? {},
+      scheduledStartAt ?? undefined,
+      Boolean(isTest)
+    );
     res.status(201).json(room);
     return;
   }

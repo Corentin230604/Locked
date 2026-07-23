@@ -28,12 +28,18 @@ public sealed class JoinResponse
     public string Lifecycle { get; set; } = "waiting";
 
     public bool ExamFileAvailable { get; set; }
+
+    /// <summary>All restrictions apply exactly as in a real exam, but a
+    /// floating "Quitter le test" button stays available — see
+    /// ExamSession.LockDown().</summary>
+    public bool IsTest { get; set; }
 }
 
 public sealed class RoomStatus
 {
     public string Lifecycle { get; set; } = "waiting";
     public bool ExamFileAvailable { get; set; }
+    public bool IsTest { get; set; }
 }
 
 /// <summary>Shape of GET /api/session — polled every few seconds since there

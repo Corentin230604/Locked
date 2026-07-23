@@ -30,6 +30,10 @@ export interface Room {
   startedAt: string | null;
   endedAt: string | null;
   examFilePath: string | null;
+  /** All restrictions apply exactly as in a real exam, but the Windows agent
+   * shows a floating "Quitter le test" button so testers aren't locked out
+   * of their own PC. */
+  isTest: boolean;
   createdAt: string;
 }
 
@@ -53,7 +57,8 @@ export type ViolationType =
   | "ai_flag"
   | "joined"
   | "submitted"
-  | "disconnected";
+  | "disconnected"
+  | "test_exit";
 
 const ROOM_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0/O/1/I
 
@@ -85,6 +90,7 @@ function toRoom(row: any): Room {
     startedAt: row.started_at,
     endedAt: row.ended_at,
     examFilePath: row.exam_file_path,
+    isTest: Boolean(row.is_test),
     createdAt: row.created_at,
     config: {
       examTitle: row.exam_title,
@@ -112,7 +118,8 @@ function toSession(row: any): Session {
 export async function createRoom(
   teacherName: string,
   partialConfig: Partial<RoomConfig> = {},
-  scheduledStartAt?: string
+  scheduledStartAt?: string,
+  isTest = false
 ): Promise<Room> {
   const config: RoomConfig = {
     examTitle: partialConfig.examTitle ?? "Examen",
@@ -136,6 +143,7 @@ export async function createRoom(
         screenshot_enabled: config.screenshot.enabled,
         screenshot_per_minute: config.screenshot.perMinute,
         scheduled_start_at: scheduledStartAt ?? null,
+        is_test: isTest,
       })
       .select()
       .single();

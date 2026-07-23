@@ -25,5 +25,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     config: result.room.config,
     lifecycle: result.room.lifecycle,
     examFileAvailable: Boolean(result.room.examFilePath),
+    isTest: result.room.isTest,
   });
 }

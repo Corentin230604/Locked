@@ -32,6 +32,10 @@ create table rooms (
   -- imported for students to work from. Null means students get a blank
   -- workbook, same as before this feature existed.
   exam_file_path text,
+  -- All restrictions apply exactly as in a real exam, but the Windows agent
+  -- shows a floating "Quitter le test" button so testers aren't locked out
+  -- of their own PC — see ExamSession.cs's LockDown().
+  is_test boolean not null default false,
   status text not null default 'open' check (status in ('open', 'closed')),
   created_at timestamptz not null default now()
 );
