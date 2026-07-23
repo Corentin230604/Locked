@@ -302,11 +302,21 @@
   let lifecycleTimer = null;
 
   // --- Config (persisted) ---
+  // Defaults for this deployment - the anon key is meant to be public
+  // (protected by RLS policies, unlike the service_role key), so committing
+  // it here is safe. Still overridable per-browser via the Connexion form,
+  // e.g. the day this points at a different customer's own project.
+  const DEFAULT_CONFIG = {
+    apiUrl: "https://locked-j4y8.onrender.com",
+    supabaseUrl: "https://kacjqpqppcqtdyebdpyi.supabase.co",
+    supabaseAnonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImthY2pxcHFwcGNxdGR5ZWJkcHlpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyMDQzNzAsImV4cCI6MjA5OTc4MDM3MH0.IoOLViEXo8JAHgF3QVlLiWDrIyUAq5_kGBisZjG8RpI",
+  };
+
   function loadConfig() {
     return {
-      apiUrl: localStorage.getItem("locked_apiUrl") || "",
-      supabaseUrl: localStorage.getItem("locked_supabaseUrl") || "",
-      supabaseAnonKey: localStorage.getItem("locked_supabaseAnonKey") || "",
+      apiUrl: localStorage.getItem("locked_apiUrl") || DEFAULT_CONFIG.apiUrl,
+      supabaseUrl: localStorage.getItem("locked_supabaseUrl") || DEFAULT_CONFIG.supabaseUrl,
+      supabaseAnonKey: localStorage.getItem("locked_supabaseAnonKey") || DEFAULT_CONFIG.supabaseAnonKey,
     };
   }
 
