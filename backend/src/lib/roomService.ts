@@ -34,6 +34,10 @@ export interface Room {
    * shows a floating "Quitter le test" button so testers aren't locked out
    * of their own PC. */
   isTest: boolean;
+  /** null = standalone room, not tied to any school (the original,
+   * pre-multi-tenant flow keeps working unchanged). */
+  schoolId: string | null;
+  createdByMembershipId: string | null;
   createdAt: string;
 }
 
@@ -47,6 +51,7 @@ export interface Session {
   joinedAt: string;
   lastSeen: string;
   submissionPath: string | null;
+  membershipId: string | null;
 }
 
 export type ViolationType =
@@ -91,6 +96,8 @@ function toRoom(row: any): Room {
     endedAt: row.ended_at,
     examFilePath: row.exam_file_path,
     isTest: Boolean(row.is_test),
+    schoolId: row.school_id,
+    createdByMembershipId: row.created_by_membership_id,
     createdAt: row.created_at,
     config: {
       examTitle: row.exam_title,
@@ -112,6 +119,7 @@ function toSession(row: any): Session {
     joinedAt: row.joined_at,
     lastSeen: row.last_seen,
     submissionPath: row.submission_path,
+    membershipId: row.membership_id,
   };
 }
 
@@ -119,7 +127,9 @@ export async function createRoom(
   teacherName: string,
   partialConfig: Partial<RoomConfig> = {},
   scheduledStartAt?: string,
-  isTest = false
+  isTest = false,
+  schoolId?: string,
+  createdByMembershipId?: string
 ): Promise<Room> {
   const config: RoomConfig = {
     examTitle: partialConfig.examTitle ?? "Examen",
@@ -144,6 +154,8 @@ export async function createRoom(
         screenshot_per_minute: config.screenshot.perMinute,
         scheduled_start_at: scheduledStartAt ?? null,
         is_test: isTest,
+        school_id: schoolId ?? null,
+        created_by_membership_id: createdByMembershipId ?? null,
       })
       .select()
       .single();
@@ -176,14 +188,15 @@ export async function getRoomById(roomId: string): Promise<Room | null> {
 
 export async function joinRoom(
   code: string,
-  studentName: string
+  studentName: string,
+  membershipId?: string
 ): Promise<{ room: Room; session: Session } | null> {
   const room = await getRoomByCode(code);
   if (!room || room.status !== "open") return null;
 
   const { data, error } = await supabaseAdmin
     .from("sessions")
-    .insert({ room_id: room.id, student_name: studentName })
+    .insert({ room_id: room.id, student_name: studentName, membership_id: membershipId ?? null })
     .select()
     .single();
   if (error) throw error;
@@ -191,6 +204,42 @@ export async function joinRoom(
   const session = toSession(data);
   await recordViolation(session.id, room.id, "joined", { studentName });
   return { room, session };
+}
+
+/** Classes a room targets — empty means no class restriction (the
+ * legacy/standalone behavior: anyone with the code can join). */
+export async function getRoomTargetClassIds(roomId: string): Promise<string[]> {
+  const { data, error } = await supabaseAdmin
+    .from("room_target_classes")
+    .select("perimeter_id")
+    .eq("room_id", roomId);
+  if (error) throw error;
+  return (data ?? []).map((row: any) => row.perimeter_id);
+}
+
+export async function setRoomTargetClasses(roomId: string, perimeterIds: string[]): Promise<void> {
+  if (perimeterIds.length === 0) return;
+  const rows = perimeterIds.map((perimeterId) => ({ room_id: roomId, perimeter_id: perimeterId }));
+  const { error } = await supabaseAdmin.from("room_target_classes").insert(rows);
+  if (error) throw error;
+}
+
+/** Intervenants added as ponctual co-surveillants of one specific room
+ * (multi-class partiels), without touching their normal class assignments. */
+export async function addRoomCoOrganizers(roomId: string, userIds: string[]): Promise<void> {
+  if (userIds.length === 0) return;
+  const rows = userIds.map((userId) => ({ room_id: roomId, user_id: userId }));
+  const { error } = await supabaseAdmin.from("room_co_organizers").insert(rows);
+  if (error) throw error;
+}
+
+export async function listRoomCoOrganizerIds(roomId: string): Promise<string[]> {
+  const { data, error } = await supabaseAdmin
+    .from("room_co_organizers")
+    .select("user_id")
+    .eq("room_id", roomId);
+  if (error) throw error;
+  return (data ?? []).map((row: any) => row.user_id);
 }
 
 export async function getSession(sessionId: string): Promise<Session | null> {

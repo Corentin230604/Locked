@@ -26,16 +26,32 @@
                 <TextBox x:Name="ServerUrlBox" Text="http://localhost:4000"
                          Style="{StaticResource RoundedTextBox}" Margin="0,0,0,14"/>
 
+                <TextBlock Text="Email" Style="{StaticResource FieldLabel}"/>
+                <TextBox x:Name="EmailBox" Style="{StaticResource RoundedTextBox}" Margin="0,0,0,14"/>
+
+                <TextBlock Text="Mot de passe" Style="{StaticResource FieldLabel}"/>
+                <PasswordBox x:Name="PasswordBox" Style="{StaticResource RoundedPasswordBox}" Margin="0,0,0,14"/>
+
+                <StackPanel x:Name="RegisterFields" Visibility="Collapsed">
+                    <TextBlock Text="Nom complet" Style="{StaticResource FieldLabel}"/>
+                    <TextBox x:Name="FullNameBox" Style="{StaticResource RoundedTextBox}" Margin="0,0,0,14"/>
+
+                    <TextBlock Text="Code classe" Style="{StaticResource FieldLabel}"/>
+                    <TextBox x:Name="ClassCodeBox" Style="{StaticResource RoundedTextBox}"
+                             Margin="0,0,0,14" CharacterCasing="Upper"/>
+                </StackPanel>
+
                 <TextBlock Text="Code de la room" Style="{StaticResource FieldLabel}"/>
                 <TextBox x:Name="RoomCodeBox" Style="{StaticResource RoundedTextBox}"
-                         Margin="0,0,0,14" CharacterCasing="Upper"/>
-
-                <TextBlock Text="Votre nom" Style="{StaticResource FieldLabel}"/>
-                <TextBox x:Name="StudentNameBox" Style="{StaticResource RoundedTextBox}" Margin="0,0,0,18"/>
+                         Margin="0,0,0,18" CharacterCasing="Upper"/>
 
                 <Button x:Name="JoinButton" Content="Rejoindre l'examen"
                         Style="{StaticResource PrimaryButton}" HorizontalAlignment="Stretch"
-                        Click="JoinButton_Click"/>
+                        Click="JoinButton_Click" Margin="0,0,0,10"/>
+
+                <Button x:Name="ToggleModeButton" Content="Nouveau sur Locked ? Créer un compte"
+                        Style="{StaticResource LinkButton}" HorizontalAlignment="Center"
+                        Click="ToggleModeButton_Click"/>
 
                 <TextBlock x:Name="StatusText" Foreground="{StaticResource DangerBrush}"
                            Margin="0,14,0,0" TextWrapping="Wrap" FontSize="12"/>

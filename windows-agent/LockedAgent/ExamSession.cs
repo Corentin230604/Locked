@@ -18,7 +18,7 @@ public sealed class ExamSession
 {
     private readonly string _baseUrl;
     private readonly JoinResponse _join;
-    private readonly HttpClient _http = new();
+    private readonly HttpClient _http;
 
     private BackendClient? _backend;
     private ExcelLauncher? _launcher;
@@ -31,10 +31,14 @@ public sealed class ExamSession
     private DispatcherTimer? _heartbeatTimer;
     private bool _locked;
 
-    public ExamSession(string baseUrl, JoinResponse join)
+    /// <summary>`http` already carries the student's Supabase Auth Bearer
+    /// token (set by JoinWindow right after sign-in) — reused for every call
+    /// this session makes so every request is authenticated consistently.</summary>
+    public ExamSession(string baseUrl, JoinResponse join, HttpClient http)
     {
         _baseUrl = baseUrl;
         _join = join;
+        _http = http;
     }
 
     public async Task StartAsync()
