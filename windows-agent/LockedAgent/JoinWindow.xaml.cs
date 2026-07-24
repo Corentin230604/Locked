@@ -77,8 +77,7 @@ public partial class JoinWindow : Window
                 });
                 if (!registerResponse.IsSuccessStatusCode)
                 {
-                    var body = await registerResponse.Content.ReadAsStringAsync();
-                    StatusText.Text = $"Inscription impossible : {body}";
+                    StatusText.Text = $"Inscription impossible : {await ExtractErrorAsync(registerResponse)}";
                     return;
                 }
             }
@@ -95,8 +94,7 @@ public partial class JoinWindow : Window
             var response = await http.PostAsJsonAsync($"{baseUrl}/api/join", new { code = roomCode, studentName = displayName });
             if (!response.IsSuccessStatusCode)
             {
-                var body = await response.Content.ReadAsStringAsync();
-                StatusText.Text = $"Impossible de rejoindre la room : {body}";
+                StatusText.Text = await ExtractErrorAsync(response);
                 return;
             }
 
@@ -131,6 +129,27 @@ public partial class JoinWindow : Window
 
         var body = await response.Content.ReadFromJsonAsync<SupabaseAuthResponse>(JsonOptions);
         return body?.AccessToken;
+    }
+
+    /// <summary>Backend errors are JSON `{ error: "..." }` — show that
+    /// message directly instead of dumping the raw response body.</summary>
+    private static async Task<string> ExtractErrorAsync(HttpResponseMessage response)
+    {
+        var body = await response.Content.ReadAsStringAsync();
+        try
+        {
+            var parsed = JsonSerializer.Deserialize<ErrorBody>(body, JsonOptions);
+            return parsed?.Error ?? body;
+        }
+        catch (JsonException)
+        {
+            return body;
+        }
+    }
+
+    private sealed class ErrorBody
+    {
+        public string? Error { get; set; }
     }
 
     private sealed class SupabaseAuthResponse

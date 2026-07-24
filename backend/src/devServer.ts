@@ -23,6 +23,7 @@ import registerStudentHandler from "../api/register-student";
 import renewMembershipHandler from "../api/renew-membership";
 import myMembershipsHandler from "../api/my-memberships";
 import schoolStatsHandler from "../api/school-stats";
+import schoolMembersHandler from "../api/school-members";
 import { runLifecycleSweep } from "./lib/lifecycleService";
 
 /**
@@ -74,6 +75,7 @@ mount("/api/register-student", registerStudentHandler);
 mount("/api/renew-membership", renewMembershipHandler);
 mount("/api/my-memberships", myMembershipsHandler);
 mount("/api/school-stats", schoolStatsHandler);
+mount("/api/school-members", schoolMembersHandler);
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 function scheduleLifecycleSweep() {

@@ -53,7 +53,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const school = await getSchoolById(room.schoolId!);
     const effectiveStatus = computeEffectiveStatus(membership.validUntil, school?.defaultGracePeriodDays ?? 60);
     if (effectiveStatus !== "active") {
-      res.status(402).json({ error: "no_active_subscription", effectiveStatus });
+      res.status(402).json({
+        error:
+          "Votre abonnement n'est plus actif. Contactez l'administrateur de votre établissement pour le renouveler.",
+        code: "no_active_subscription",
+        effectiveStatus,
+      });
       return;
     }
 
