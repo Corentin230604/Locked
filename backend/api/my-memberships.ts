@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "../src/lib/httpTypes";
-import { getCaller } from "../src/lib/authContext";
+import { getCaller, isPlatformAdmin } from "../src/lib/authContext";
 import { computeEffectiveStatus, getSchoolById, listMembershipsForUser } from "../src/lib/schoolService";
 
 /**
@@ -32,5 +32,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })
   );
 
-  res.status(200).json({ memberships: withStatus });
+  res.status(200).json({ memberships: withStatus, isPlatformAdmin: await isPlatformAdmin(caller.userId) });
 }

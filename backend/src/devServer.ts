@@ -22,6 +22,7 @@ import intervenantClassesHandler from "../api/intervenant-classes";
 import registerStudentHandler from "../api/register-student";
 import renewMembershipHandler from "../api/renew-membership";
 import myMembershipsHandler from "../api/my-memberships";
+import schoolStatsHandler from "../api/school-stats";
 import { runLifecycleSweep } from "./lib/lifecycleService";
 
 /**
@@ -72,6 +73,7 @@ mount("/api/intervenant-classes", intervenantClassesHandler);
 mount("/api/register-student", registerStudentHandler);
 mount("/api/renew-membership", renewMembershipHandler);
 mount("/api/my-memberships", myMembershipsHandler);
+mount("/api/school-stats", schoolStatsHandler);
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 function scheduleLifecycleSweep() {
