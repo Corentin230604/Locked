@@ -15,6 +15,10 @@ import startHandler from "../api/start";
 import endHandler from "../api/end";
 import examFileHandler from "../api/exam-file";
 import submissionHandler from "../api/submission";
+import schoolsHandler from "../api/schools";
+import perimetersHandler from "../api/perimeters";
+import intervenantsHandler from "../api/intervenants";
+import intervenantClassesHandler from "../api/intervenant-classes";
 
 /**
  * Express entrypoint mounting the same handler functions Vercel's serverless
@@ -57,6 +61,10 @@ mount("/api/start", startHandler);
 mount("/api/end", endHandler);
 mount("/api/exam-file", examFileHandler);
 mount("/api/submission", submissionHandler);
+mount("/api/schools", schoolsHandler);
+mount("/api/perimeters", perimetersHandler);
+mount("/api/intervenants", intervenantsHandler);
+mount("/api/intervenant-classes", intervenantClassesHandler);
 
 app.listen(PORT, () => {
   console.log(`Locked dev server listening on http://localhost:${PORT}`);
