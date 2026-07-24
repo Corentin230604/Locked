@@ -19,6 +19,10 @@ import schoolsHandler from "../api/schools";
 import perimetersHandler from "../api/perimeters";
 import intervenantsHandler from "../api/intervenants";
 import intervenantClassesHandler from "../api/intervenant-classes";
+import registerStudentHandler from "../api/register-student";
+import renewMembershipHandler from "../api/renew-membership";
+import myMembershipsHandler from "../api/my-memberships";
+import { runLifecycleSweep } from "./lib/lifecycleService";
 
 /**
  * Express entrypoint mounting the same handler functions Vercel's serverless
@@ -65,6 +69,22 @@ mount("/api/schools", schoolsHandler);
 mount("/api/perimeters", perimetersHandler);
 mount("/api/intervenants", intervenantsHandler);
 mount("/api/intervenant-classes", intervenantClassesHandler);
+mount("/api/register-student", registerStudentHandler);
+mount("/api/renew-membership", renewMembershipHandler);
+mount("/api/my-memberships", myMembershipsHandler);
+
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+function scheduleLifecycleSweep() {
+  runLifecycleSweep()
+    .then(({ updated, deleted }) => {
+      if (updated || deleted) {
+        console.log(`Lifecycle sweep: ${updated} pending_renewal, ${deleted} deleted.`);
+      }
+    })
+    .catch((err) => console.error("Lifecycle sweep failed:", err));
+}
+scheduleLifecycleSweep();
+setInterval(scheduleLifecycleSweep, ONE_DAY_MS);
 
 app.listen(PORT, () => {
   console.log(`Locked dev server listening on http://localhost:${PORT}`);
