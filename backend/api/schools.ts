@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "../src/lib/httpTypes";
 import { getCaller, isPlatformAdmin } from "../src/lib/authContext";
-import { createSchool, listSchools } from "../src/lib/schoolService";
+import { computeDefaultValidUntil, createSchool, inviteSchoolAdmin, listSchools } from "../src/lib/schoolService";
 
 /** Platform-admin only: provisions a new school, or lists every school on
  * the platform. This is the "je dois lui programmer son compte" step —
@@ -23,12 +23,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (req.method === "POST") {
-    const { name, emailDomains, defaultValidityYears, defaultGracePeriodDays } = req.body ?? {};
+    const { name, emailDomains, defaultValidityYears, defaultGracePeriodDays, initialAdminEmail } = req.body ?? {};
     if (!name || !Array.isArray(emailDomains) || emailDomains.length === 0) {
       res.status(400).json({ error: "name and emailDomains[] are required" });
       return;
     }
     const school = await createSchool(name, emailDomains, defaultValidityYears, defaultGracePeriodDays);
+
+    // Closes the bootstrap gap: without this, nobody could become this
+    // school's first admin except via a direct SQL insert.
+    if (initialAdminEmail) {
+      await inviteSchoolAdmin({
+        schoolId: school.id,
+        email: initialAdminEmail,
+        adminPerimeterId: null,
+        validUntil: computeDefaultValidUntil(school.defaultValidityYears),
+      });
+    }
+
     res.status(201).json(school);
     return;
   }

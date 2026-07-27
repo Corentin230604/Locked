@@ -286,6 +286,28 @@ export async function renewMembership(membershipId: string, validUntil: string):
   return data ? toMembership(data) : null;
 }
 
+/** Change an existing membership's role and/or scope — promote/demote,
+ * reassign a scoped admin's perimeter, or fix a student's class. Reserved
+ * for a full-school admin or the platform admin (see api/update-membership.ts). */
+export async function updateMembershipRole(
+  membershipId: string,
+  updates: { role?: MembershipRole; adminPerimeterId?: string | null; classPerimeterId?: string | null }
+): Promise<SchoolMembership | null> {
+  const patch: Record<string, unknown> = {};
+  if (updates.role !== undefined) patch.role = updates.role;
+  if (updates.adminPerimeterId !== undefined) patch.admin_perimeter_id = updates.adminPerimeterId;
+  if (updates.classPerimeterId !== undefined) patch.class_perimeter_id = updates.classPerimeterId;
+
+  const { data, error } = await supabaseAdmin
+    .from("school_memberships")
+    .update(patch)
+    .eq("id", membershipId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data ? toMembership(data) : null;
+}
+
 /** Called by the daily cleanup job when an expired membership crosses into
  * "pending_renewal" (informational only — deletion after the grace period
  * is a separate step, see lifecycleService.ts). */
@@ -354,4 +376,26 @@ export async function inviteIntervenant(params: {
   }
 
   return membership;
+}
+
+/** Invites a school_admin by email — same activation-link mechanism as
+ * inviteIntervenant. adminPerimeterId null means full-school scope. */
+export async function inviteSchoolAdmin(params: {
+  schoolId: string;
+  email: string;
+  adminPerimeterId: string | null;
+  validUntil: string;
+}): Promise<SchoolMembership> {
+  const { data: invited, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(params.email);
+  if (inviteError || !invited.user) {
+    throw inviteError ?? new Error("invite failed: no user returned");
+  }
+
+  return createMembership({
+    userId: invited.user.id,
+    schoolId: params.schoolId,
+    role: "school_admin",
+    adminPerimeterId: params.adminPerimeterId,
+    validUntil: params.validUntil,
+  });
 }

@@ -28,6 +28,9 @@ import joinOrganizerHandler from "../api/join-organizer";
 import myRoomsHandler from "../api/my-rooms";
 import mySessionsHandler from "../api/my-sessions";
 import roomViolationsHandler from "../api/room-violations";
+import schoolAdminsHandler from "../api/school-admins";
+import updateMembershipHandler from "../api/update-membership";
+import revokeMembershipHandler from "../api/revoke-membership";
 import { runLifecycleSweep } from "./lib/lifecycleService";
 
 /**
@@ -84,6 +87,9 @@ mount("/api/join-organizer", joinOrganizerHandler);
 mount("/api/my-rooms", myRoomsHandler);
 mount("/api/my-sessions", mySessionsHandler);
 mount("/api/room-violations", roomViolationsHandler);
+mount("/api/school-admins", schoolAdminsHandler);
+mount("/api/update-membership", updateMembershipHandler);
+mount("/api/revoke-membership", revokeMembershipHandler);
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 function scheduleLifecycleSweep() {
