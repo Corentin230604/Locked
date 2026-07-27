@@ -1,0 +1,82 @@
+<Window x:Class="LockedAgent.StudentDashboardWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Locked" Width="440" SizeToContent="Height"
+        WindowStartupLocation="CenterScreen" ResizeMode="NoResize"
+        Background="{StaticResource BackgroundBrush}"
+        FontFamily="Segoe UI">
+    <Grid Margin="28">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" Margin="0,0,0,20">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0">
+                <TextBlock Text="Locked" FontSize="24" FontWeight="Bold" Foreground="{StaticResource TextBrush}"/>
+                <TextBlock x:Name="GreetingText" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0"/>
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+                <Button x:Name="ProfileButton" Content="Profil" Style="{StaticResource SecondaryButton}"
+                        Padding="12,6" FontSize="12" Margin="0,0,8,0" Click="ProfileButton_Click"/>
+                <Button x:Name="LogoutButton" Content="Déconnexion" Style="{StaticResource SecondaryButton}"
+                        Padding="12,6" FontSize="12" Click="LogoutButton_Click"/>
+            </StackPanel>
+        </Grid>
+
+        <Border Grid.Row="1" Background="{StaticResource CardBrush}" CornerRadius="16"
+                Padding="20" BorderBrush="#EAEAEC" BorderThickness="1" Margin="0,0,0,16">
+            <StackPanel>
+                <TextBlock Text="Rejoindre une room" FontSize="15" FontWeight="SemiBold"
+                           Foreground="{StaticResource TextBrush}" Margin="0,0,0,12"/>
+                <TextBlock Text="Code de la room" Style="{StaticResource FieldLabel}"/>
+                <TextBox x:Name="RoomCodeBox" Style="{StaticResource RoundedTextBox}"
+                         Margin="0,0,0,14" CharacterCasing="Upper"/>
+                <Button x:Name="JoinButton" Content="Rejoindre" Style="{StaticResource PrimaryButton}"
+                        HorizontalAlignment="Stretch" Click="JoinButton_Click"/>
+                <TextBlock x:Name="StatusText" Foreground="{StaticResource DangerBrush}"
+                           Margin="0,10,0,0" TextWrapping="Wrap" FontSize="12"/>
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="2" Background="{StaticResource CardBrush}" CornerRadius="16"
+                Padding="20" BorderBrush="#EAEAEC" BorderThickness="1">
+            <StackPanel>
+                <TextBlock Text="Historique" FontSize="15" FontWeight="SemiBold"
+                           Foreground="{StaticResource TextBrush}" Margin="0,0,0,12"/>
+                <ScrollViewer MaxHeight="260" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl x:Name="HistoryList">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="#FBFBFD" BorderBrush="{StaticResource FieldBorderBrush}"
+                                        BorderThickness="1" CornerRadius="10" Padding="12,10" Margin="0,0,0,8">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="{Binding ExamTitle}" FontWeight="SemiBold" FontSize="13"
+                                                       Foreground="{StaticResource TextBrush}"/>
+                                            <TextBlock Text="{Binding DateDisplay}" FontSize="11"
+                                                       Foreground="{StaticResource TextSecondaryBrush}"/>
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="1" Text="{Binding StatusDisplay}" FontSize="11"
+                                                   VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+                <TextBlock x:Name="EmptyHistoryText" Text="Aucun examen pour le moment."
+                           Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

@@ -57,3 +57,41 @@ public sealed class ExamFileResponse
     public string Url { get; set; } = "";
     public string Filename { get; set; } = "";
 }
+
+public sealed class SessionHistoryRoom
+{
+    public string Code { get; set; } = "";
+    public bool IsTest { get; set; }
+    public string CreatedAt { get; set; } = "";
+    public RoomConfig Config { get; set; } = new();
+}
+
+/// <summary>One row of GET /api/my-sessions — the student's own room
+/// history, shown on StudentDashboardWindow.</summary>
+public sealed class SessionHistoryItem
+{
+    public string Status { get; set; } = "";
+    public string JoinedAt { get; set; } = "";
+    public SessionHistoryRoom Room { get; set; } = new();
+}
+
+public sealed class SessionHistoryResponse
+{
+    public List<SessionHistoryItem> Sessions { get; set; } = new();
+}
+
+/// <summary>One row of GET /api/my-memberships — used for the Profil
+/// screen (a student only ever has one, but the shape supports several).</summary>
+public sealed class MembershipInfo
+{
+    public string Role { get; set; } = "";
+    public string SchoolName { get; set; } = "";
+    public string? ClassName { get; set; }
+    public string ValidUntil { get; set; } = "";
+    public string EffectiveStatus { get; set; } = "";
+}
+
+public sealed class MyMembershipsResponse
+{
+    public List<MembershipInfo> Memberships { get; set; } = new();
+}

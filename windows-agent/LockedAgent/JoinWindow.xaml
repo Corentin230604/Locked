@@ -41,13 +41,9 @@
                              Margin="0,0,0,14" CharacterCasing="Upper"/>
                 </StackPanel>
 
-                <TextBlock Text="Code de la room" Style="{StaticResource FieldLabel}"/>
-                <TextBox x:Name="RoomCodeBox" Style="{StaticResource RoundedTextBox}"
-                         Margin="0,0,0,18" CharacterCasing="Upper"/>
-
-                <Button x:Name="JoinButton" Content="Rejoindre l'examen"
+                <Button x:Name="ContinueButton" Content="Continuer"
                         Style="{StaticResource PrimaryButton}" HorizontalAlignment="Stretch"
-                        Click="JoinButton_Click" Margin="0,0,0,10"/>
+                        Click="ContinueButton_Click" Margin="0,4,0,10"/>
 
                 <Button x:Name="ToggleModeButton" Content="Nouveau sur Locked ? Créer un compte"
                         Style="{StaticResource LinkButton}" HorizontalAlignment="Center"

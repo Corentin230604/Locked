@@ -35,27 +35,25 @@ public partial class JoinWindow : Window
             : "Nouveau sur Locked ? Créer un compte";
     }
 
-    private async void JoinButton_Click(object sender, RoutedEventArgs e)
+    private async void ContinueButton_Click(object sender, RoutedEventArgs e)
     {
-        JoinButton.IsEnabled = false;
+        ContinueButton.IsEnabled = false;
         StatusText.Text = "";
         try
         {
             var baseUrl = ServerUrlBox.Text.TrimEnd('/');
             var email = EmailBox.Text.Trim();
             var password = PasswordBox.Password;
-            var roomCode = RoomCodeBox.Text.Trim().ToUpperInvariant();
 
-            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password) ||
-                string.IsNullOrWhiteSpace(roomCode))
+            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
             {
-                StatusText.Text = "Merci de renseigner votre email, votre mot de passe et le code de la room.";
+                StatusText.Text = "Merci de renseigner votre email et votre mot de passe.";
                 return;
             }
 
-            // Owned by the ExamSession afterward, not disposed here - it
-            // needs to stay alive (with the Bearer token attached below) for
-            // the whole exam session's polling/uploads.
+            // Owned by StudentDashboardWindow/ExamSession afterward, not
+            // disposed here - it needs to stay alive (with the Bearer token
+            // attached below) for the whole session's polling/uploads.
             var http = new HttpClient();
 
             var fullName = FullNameBox.Text.Trim();
@@ -90,20 +88,7 @@ public partial class JoinWindow : Window
             }
             http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
 
-            var displayName = fullName.Length > 0 ? fullName : email;
-            var response = await http.PostAsJsonAsync($"{baseUrl}/api/join", new { code = roomCode, studentName = displayName });
-            if (!response.IsSuccessStatusCode)
-            {
-                StatusText.Text = await ExtractErrorAsync(response);
-                return;
-            }
-
-            var join = await response.Content.ReadFromJsonAsync<JoinResponse>(JsonOptions)
-                ?? throw new InvalidOperationException("Réponse du serveur invalide.");
-
-            var session = new ExamSession(baseUrl, join, http);
-            await session.StartAsync();
-
+            new StudentDashboardWindow(baseUrl, http, email).Show();
             Hide();
         }
         catch (Exception ex)
@@ -112,7 +97,7 @@ public partial class JoinWindow : Window
         }
         finally
         {
-            JoinButton.IsEnabled = true;
+            ContinueButton.IsEnabled = true;
         }
     }
 
@@ -133,7 +118,7 @@ public partial class JoinWindow : Window
 
     /// <summary>Backend errors are JSON `{ error: "..." }` — show that
     /// message directly instead of dumping the raw response body.</summary>
-    private static async Task<string> ExtractErrorAsync(HttpResponseMessage response)
+    internal static async Task<string> ExtractErrorAsync(HttpResponseMessage response)
     {
         var body = await response.Content.ReadAsStringAsync();
         try
