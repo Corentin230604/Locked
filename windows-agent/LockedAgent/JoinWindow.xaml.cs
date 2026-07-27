@@ -83,7 +83,13 @@ public partial class JoinWindow : Window
             var jwt = await SignInAsync(http, email, password);
             if (jwt is null)
             {
-                StatusText.Text = "Email ou mot de passe incorrect.";
+                // Supabase never distinguishes "no account" from "wrong
+                // password" (avoids leaking which emails are registered), so
+                // this message can't tell which case it is either - it just
+                // nudges toward the actual fix for a first-time student.
+                StatusText.Text = _registerMode
+                    ? "Email ou mot de passe incorrect."
+                    : "Email ou mot de passe incorrect. Si vous n'avez pas encore de compte, cliquez sur « Créer un compte » ci-dessous.";
                 return;
             }
             http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
