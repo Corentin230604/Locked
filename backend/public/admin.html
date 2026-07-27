@@ -77,6 +77,8 @@
   }
   .school-row .name { font-weight: 600; }
   .school-row .domains { color: var(--text-secondary); font-size: 0.85rem; }
+  .enter-link { color: var(--accent); text-decoration: none; font-size: 0.9rem; font-weight: 500; white-space: nowrap; }
+  .enter-link:hover { text-decoration: underline; }
   .stats { display: flex; gap: 1.25rem; font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.5rem; }
   .empty-state { color: var(--text-secondary); font-size: 0.9rem; }
   .status-line { font-size: 0.85rem; color: var(--danger); margin-top: 0.75rem; min-height: 1.2em; }
@@ -132,6 +134,8 @@
           <input id="gracePeriodDays" type="number" min="0" value="60" />
         </div>
       </div>
+      <label for="initialAdminEmail">Email du premier admin (optionnel)</label>
+      <input id="initialAdminEmail" type="email" placeholder="admin@ecole.fr" />
       <div style="margin-top: 1.25rem;">
         <button class="primary" id="createSchoolBtn">Créer l'établissement</button>
       </div>
@@ -205,9 +209,10 @@
       $("createStatus").textContent = "Renseigne un nom et au moins un domaine email.";
       return;
     }
+    const initialAdminEmail = $("initialAdminEmail").value.trim() || undefined;
     const res = await authFetch("/api/schools", {
       method: "POST",
-      body: JSON.stringify({ name, emailDomains, defaultValidityYears, defaultGracePeriodDays }),
+      body: JSON.stringify({ name, emailDomains, defaultValidityYears, defaultGracePeriodDays, initialAdminEmail }),
     });
     if (!res.ok) {
       const body = await res.text();
@@ -216,6 +221,7 @@
     }
     $("schoolName").value = "";
     $("schoolDomains").value = "";
+    $("initialAdminEmail").value = "";
     loadSchools();
   });
 
@@ -241,6 +247,7 @@
           <div class="domains">${school.emailDomains.join(", ")}</div>
           <div class="stats" id="stats-${school.id}">Chargement des statistiques...</div>
         </div>
+        <a class="enter-link" href="school-admin.html?schoolId=${encodeURIComponent(school.id)}">Entrer →</a>
       `;
       el.appendChild(div);
       loadStats(school.id);

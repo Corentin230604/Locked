@@ -93,6 +93,21 @@
   .badge.pending_renewal { color: var(--warning); background: var(--warning-bg); }
   .empty-state { color: var(--text-secondary); font-size: 0.9rem; }
   .status-line { font-size: 0.85rem; color: var(--danger); margin-top: 0.75rem; min-height: 1.2em; }
+  .breadcrumb { font-size: 0.9rem; margin-bottom: 1.25rem; color: var(--text-secondary); }
+  .breadcrumb a { color: var(--accent); text-decoration: none; }
+  .breadcrumb a:hover { text-decoration: underline; }
+  .breadcrumb .sep { margin: 0 0.4rem; }
+  .breadcrumb .current { font-weight: 600; color: var(--text); }
+  .enter-card {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0.75rem 0.9rem; border-radius: var(--radius-sm); margin-bottom: 0.5rem;
+    background: #fbfbfd; border: 1px solid var(--border); cursor: pointer;
+  }
+  .enter-card:hover { border-color: var(--accent); }
+  .row-item .edit-panel { margin-top: 0.6rem; padding-top: 0.6rem; border-top: 1px solid var(--border); width: 100%; }
+  .row-item.stacked { flex-direction: column; align-items: stretch; }
+  button.link-btn { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 0.78rem; padding: 0.2rem 0.4rem; font-family: inherit; }
+  button.danger-link { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 0.78rem; padding: 0.2rem 0.4rem; font-family: inherit; }
 
   @media (prefers-color-scheme: dark) {
     :root {
@@ -134,33 +149,41 @@
   </section>
 
   <section id="adminSection" class="hidden">
-    <div class="card">
-      <h2>Périmètres (campus / département / classe)</h2>
-      <div id="perimeters"><p class="empty-state">Chargement...</p></div>
+    <div class="breadcrumb" id="breadcrumb"></div>
 
-      <label for="perimeterName" style="margin-top: 1.25rem;">Nom</label>
-      <input id="perimeterName" placeholder="L1 Informatique" />
-      <div class="row">
-        <div>
-          <label for="perimeterKind">Type</label>
-          <select id="perimeterKind">
-            <option value="campus">Campus</option>
-            <option value="departement">Département</option>
-            <option value="classe">Classe</option>
-            <option value="group">Autre groupe</option>
-          </select>
-        </div>
-        <div>
-          <label for="perimeterParent">Rattaché à</label>
-          <select id="perimeterParent">
-            <option value="">— (racine de l'école) —</option>
-          </select>
-        </div>
+    <div class="card">
+      <h2 id="perimetersTitle">Environnements</h2>
+      <div id="perimeters"><p class="empty-state">Chargement...</p></div>
+      <div id="classCodeRow" class="hidden" style="margin-bottom: 0.9rem;">
+        Code classe : <code id="classCodeDisplay"></code>
       </div>
+
+      <label for="perimeterName" style="margin-top: 1.25rem;">Créer un environnement ici</label>
+      <input id="perimeterName" placeholder="L1 Informatique" />
+      <label for="perimeterKind">Type</label>
+      <select id="perimeterKind">
+        <option value="campus">Campus</option>
+        <option value="departement">Département</option>
+        <option value="classe">Classe</option>
+        <option value="group">Autre groupe</option>
+      </select>
       <div style="margin-top: 1.25rem;">
         <button class="primary" id="createPerimeterBtn">Créer</button>
       </div>
       <p class="status-line" id="perimeterStatus"></p>
+    </div>
+
+    <div class="card">
+      <h2>Inviter un admin</h2>
+      <p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0 0 0.9rem;">
+        L'admin invité ici gérera l'environnement courant (<span id="inviteAdminScopeLabel"></span>).
+      </p>
+      <label for="schoolAdminEmail">Email</label>
+      <input id="schoolAdminEmail" type="email" />
+      <div style="margin-top: 1.25rem;">
+        <button class="primary" id="inviteAdminBtn">Envoyer l'invitation</button>
+      </div>
+      <p class="status-line" id="inviteAdminStatus"></p>
     </div>
 
     <div class="card">
@@ -193,8 +216,14 @@
   const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   let currentSchoolId = null;
-  let currentMembership = null; // this admin's own school_memberships row
+  let currentSchoolName = "";
+  let currentMembership = null; // this admin's own school_memberships row (synthetic for platform admins)
+  let isPlatformAdminViewer = false;
   let perimeters = [];
+  let currentPerimeterId = null; // null = racine (l'école)
+
+  const urlParams = new URLSearchParams(location.search);
+  const enteredSchoolId = urlParams.get("schoolId");
 
   async function authFetch(path, options = {}) {
     const { data } = await client.auth.getSession();
@@ -226,7 +255,23 @@
       $("loginStatus").textContent = "Session invalide, reconnecte-toi.";
       return;
     }
-    const { memberships } = await res.json();
+    const { memberships, isPlatformAdmin } = await res.json();
+    isPlatformAdminViewer = isPlatformAdmin;
+
+    // Entering a specific school from admin.html — a platform admin bypasses
+    // the "must have a membership there" requirement entirely.
+    if (enteredSchoolId && isPlatformAdmin) {
+      $("loginCard").classList.add("hidden");
+      let schoolName = "";
+      const schoolsRes = await authFetch("/api/schools");
+      if (schoolsRes.ok) {
+        const { schools } = await schoolsRes.json();
+        schoolName = schools.find((s) => s.id === enteredSchoolId)?.name ?? "";
+      }
+      selectSchool({ schoolId: enteredSchoolId, schoolName, adminPerimeterId: null, synthetic: true });
+      return;
+    }
+
     const adminMemberships = memberships.filter((m) => m.role === "school_admin");
     if (adminMemberships.length === 0) {
       $("loginStatus").textContent = "Ce compte n'est admin d'aucun établissement.";
@@ -259,24 +304,75 @@
   function selectSchool(membership) {
     currentMembership = membership;
     currentSchoolId = membership.schoolId;
+    currentSchoolName = membership.schoolName || "";
+    currentPerimeterId = null;
     $("adminSection").classList.remove("hidden");
     loadPerimeters();
     loadMembers();
   }
 
-  // --- Périmètres ---
+  // --- Fil d'ariane ---
+  function ancestorChain(perimeterId) {
+    const chain = [];
+    let id = perimeterId;
+    while (id) {
+      const node = perimeters.find((p) => p.id === id);
+      if (!node) break;
+      chain.unshift(node);
+      id = node.parentId;
+    }
+    return chain;
+  }
+
+  function renderBreadcrumb() {
+    const el = $("breadcrumb");
+    el.innerHTML = "";
+    const rootLink = document.createElement("a");
+    rootLink.href = "#";
+    rootLink.textContent = currentSchoolName || "École";
+    if (currentPerimeterId === null) {
+      const span = document.createElement("span");
+      span.className = "current";
+      span.textContent = rootLink.textContent;
+      el.appendChild(span);
+    } else {
+      rootLink.addEventListener("click", (e) => { e.preventDefault(); currentPerimeterId = null; renderPerimeterLevel(); });
+      el.appendChild(rootLink);
+    }
+
+    for (const node of ancestorChain(currentPerimeterId)) {
+      const sep = document.createElement("span");
+      sep.className = "sep";
+      sep.textContent = "›";
+      el.appendChild(sep);
+
+      if (node.id === currentPerimeterId) {
+        const span = document.createElement("span");
+        span.className = "current";
+        span.textContent = node.name;
+        el.appendChild(span);
+      } else {
+        const a = document.createElement("a");
+        a.href = "#";
+        a.textContent = node.name;
+        a.addEventListener("click", (e) => { e.preventDefault(); currentPerimeterId = node.id; renderPerimeterLevel(); });
+        el.appendChild(a);
+      }
+    }
+  }
+
+  // --- Périmètres (environnements) ---
   $("createPerimeterBtn").addEventListener("click", async () => {
     $("perimeterStatus").textContent = "";
     const name = $("perimeterName").value.trim();
     const kind = $("perimeterKind").value;
-    const parentId = $("perimeterParent").value || null;
     if (!name) {
       $("perimeterStatus").textContent = "Renseigne un nom.";
       return;
     }
     const res = await authFetch("/api/perimeters", {
       method: "POST",
-      body: JSON.stringify({ schoolId: currentSchoolId, parentId, name, kind }),
+      body: JSON.stringify({ schoolId: currentSchoolId, parentId: currentPerimeterId, name, kind }),
     });
     if (!res.ok) {
       const body = await res.text();
@@ -284,7 +380,7 @@
       return;
     }
     $("perimeterName").value = "";
-    loadPerimeters();
+    await loadPerimeters();
   });
 
   function perimeterLabel(p) {
@@ -294,58 +390,79 @@
 
   async function loadPerimeters() {
     const res = await authFetch(`/api/perimeters?schoolId=${encodeURIComponent(currentSchoolId)}`);
-    const el = $("perimeters");
     if (!res.ok) {
-      el.innerHTML = '<p class="empty-state">Impossible de charger les périmètres.</p>';
+      $("perimeters").innerHTML = '<p class="empty-state">Impossible de charger les environnements.</p>';
       return;
     }
     const data = await res.json();
     perimeters = data.perimeters;
+    renderPerimeterLevel();
+    renderClassCheckboxes();
+  }
 
-    // Parent picker
-    const parentSelect = $("perimeterParent");
-    parentSelect.innerHTML = '<option value="">— (racine de l\'école) —</option>';
-    for (const p of perimeters) {
-      const opt = document.createElement("option");
-      opt.value = p.id;
-      opt.textContent = perimeterLabel(p);
-      parentSelect.appendChild(opt);
+  function renderPerimeterLevel() {
+    renderBreadcrumb();
+    const el = $("perimeters");
+    const currentNode = perimeters.find((p) => p.id === currentPerimeterId) || null;
+
+    $("classCodeRow").classList.toggle("hidden", !currentNode || currentNode.kind !== "classe");
+    if (currentNode && currentNode.kind === "classe") {
+      $("classCodeDisplay").textContent = currentNode.joinCode || "";
     }
 
-    if (perimeters.length === 0) {
-      el.innerHTML = '<p class="empty-state">Aucun périmètre pour le moment.</p>';
-    } else {
-      el.innerHTML = "";
-      for (const p of perimeters) {
-        const parent = perimeters.find((x) => x.id === p.parentId);
-        const div = document.createElement("div");
-        div.className = "row-item";
-        div.innerHTML = `
-          <span>${perimeterLabel(p)}${parent ? ` <span class="meta">— sous ${parent.name}</span>` : ""}</span>
-          ${p.joinCode ? `<code>${p.joinCode}</code>` : ""}
-        `;
-        el.appendChild(div);
-      }
-    }
+    $("inviteAdminScopeLabel").textContent = currentNode ? currentNode.name : (currentSchoolName || "toute l'école");
 
-    // Class checkboxes for intervenant invites
+    const children = perimeters.filter((p) => p.parentId === currentPerimeterId);
+    if (children.length === 0) {
+      el.innerHTML = '<p class="empty-state">Aucun sous-environnement ici.</p>';
+      return;
+    }
+    el.innerHTML = "";
+    for (const p of children) {
+      const div = document.createElement("div");
+      div.className = "enter-card";
+      div.innerHTML = `<span>${perimeterLabel(p)}</span>${p.joinCode ? `<code>${p.joinCode}</code>` : "<span>Entrer →</span>"}`;
+      div.addEventListener("click", () => { currentPerimeterId = p.id; renderPerimeterLevel(); });
+      el.appendChild(div);
+    }
+  }
+
+  function renderClassCheckboxes() {
     const classes = perimeters.filter((p) => p.kind === "classe");
     const checkboxEl = $("classCheckboxes");
     if (classes.length === 0) {
       checkboxEl.innerHTML = '<p class="empty-state">Aucune classe créée pour le moment.</p>';
-    } else {
-      checkboxEl.innerHTML = "";
-      for (const c of classes) {
-        const div = document.createElement("div");
-        div.className = "checkbox-row";
-        div.innerHTML = `
-          <input type="checkbox" id="class-${c.id}" value="${c.id}" />
-          <label for="class-${c.id}">${c.name}</label>
-        `;
-        checkboxEl.appendChild(div);
-      }
+      return;
+    }
+    checkboxEl.innerHTML = "";
+    for (const c of classes) {
+      const div = document.createElement("div");
+      div.className = "checkbox-row";
+      div.innerHTML = `<input type="checkbox" id="class-${c.id}" value="${c.id}" /><label for="class-${c.id}">${c.name}</label>`;
+      checkboxEl.appendChild(div);
     }
   }
+
+  // --- Invitation admin ---
+  $("inviteAdminBtn").addEventListener("click", async () => {
+    $("inviteAdminStatus").textContent = "";
+    const email = $("schoolAdminEmail").value.trim();
+    if (!email) {
+      $("inviteAdminStatus").textContent = "Renseigne un email.";
+      return;
+    }
+    const res = await authFetch("/api/school-admins", {
+      method: "POST",
+      body: JSON.stringify({ schoolId: currentSchoolId, email, adminPerimeterId: currentPerimeterId }),
+    });
+    if (!res.ok) {
+      $("inviteAdminStatus").textContent = `Invitation impossible : ${await res.text()}`;
+      return;
+    }
+    $("schoolAdminEmail").value = "";
+    $("inviteAdminStatus").textContent = "Invitation envoyée.";
+    loadMembers();
+  });
 
   // --- Invitation intervenant ---
   $("inviteBtn").addEventListener("click", async () => {
@@ -364,8 +481,7 @@
       body: JSON.stringify({ schoolId: currentSchoolId, email, classPerimeterIds: classIds }),
     });
     if (!res.ok) {
-      const body = await res.text();
-      $("inviteStatus").textContent = `Invitation impossible : ${body}`;
+      $("inviteStatus").textContent = `Invitation impossible : ${await res.text()}`;
       return;
     }
     $("intervenantEmail").value = "";
@@ -374,6 +490,12 @@
   });
 
   // --- Membres ---
+  const roleLabel = { school_admin: "Admin", intervenant: "Intervenant", etudiant: "Élève" };
+
+  function canManage() {
+    return isPlatformAdminViewer || currentMembership?.adminPerimeterId == null;
+  }
+
   async function loadMembers() {
     const res = await authFetch(`/api/school-members?schoolId=${encodeURIComponent(currentSchoolId)}`);
     const el = $("members");
@@ -386,28 +508,59 @@
       el.innerHTML = '<p class="empty-state">Aucun membre pour le moment.</p>';
       return;
     }
-    const roleLabel = { school_admin: "Admin", intervenant: "Intervenant", etudiant: "Élève" };
-    const canRenew = currentMembership?.adminPerimeterId == null;
+    const manage = canManage();
     el.innerHTML = "";
     for (const m of members) {
       const div = document.createElement("div");
-      div.className = "row-item";
+      div.className = "row-item stacked";
       div.innerHTML = `
-        <span>${roleLabel[m.role] ?? m.role} <span class="meta">— valide jusqu'au ${m.validUntil}</span></span>
-        <span>
-          <span class="badge ${m.effectiveStatus}">${m.effectiveStatus === "active" ? "Actif" : "En attente de renouvellement"}</span>
-          ${canRenew && m.effectiveStatus !== "active" ? `<button class="small primary" data-id="${m.id}">Renouveler</button>` : ""}
-        </span>
+        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+          <span>${roleLabel[m.role] ?? m.role} <span class="meta">— valide jusqu'au ${m.validUntil}</span></span>
+          <span>
+            <span class="badge ${m.effectiveStatus}">${m.effectiveStatus === "active" ? "Actif" : "En attente de renouvellement"}</span>
+            ${manage && m.effectiveStatus !== "active" ? `<button class="small primary" data-renew="${m.id}">Renouveler</button>` : ""}
+            ${manage ? `<button class="link-btn" data-edit="${m.id}">Modifier</button>` : ""}
+            ${manage ? `<button class="danger-link" data-revoke="${m.id}">Révoquer</button>` : ""}
+          </span>
+        </div>
+        <div class="edit-panel hidden" id="edit-${m.id}">
+          <label>Rôle</label>
+          <select id="role-${m.id}">
+            <option value="school_admin" ${m.role === "school_admin" ? "selected" : ""}>Admin</option>
+            <option value="intervenant" ${m.role === "intervenant" ? "selected" : ""}>Intervenant</option>
+            <option value="etudiant" ${m.role === "etudiant" ? "selected" : ""}>Élève</option>
+          </select>
+          <div style="margin-top: 0.75rem;">
+            <button class="small primary" data-save="${m.id}">Enregistrer</button>
+          </div>
+        </div>
       `;
       el.appendChild(div);
     }
-    el.querySelectorAll("button[data-id]").forEach((btn) => {
+
+    el.querySelectorAll("button[data-renew]").forEach((btn) => {
       btn.addEventListener("click", async () => {
         btn.disabled = true;
-        await authFetch("/api/renew-membership", {
-          method: "POST",
-          body: JSON.stringify({ membershipId: btn.dataset.id }),
-        });
+        await authFetch("/api/renew-membership", { method: "POST", body: JSON.stringify({ membershipId: btn.dataset.renew }) });
+        loadMembers();
+      });
+    });
+    el.querySelectorAll("button[data-edit]").forEach((btn) => {
+      btn.addEventListener("click", () => $(`edit-${btn.dataset.edit}`).classList.toggle("hidden"));
+    });
+    el.querySelectorAll("button[data-save]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const id = btn.dataset.save;
+        const role = $(`role-${id}`).value;
+        await authFetch("/api/update-membership", { method: "POST", body: JSON.stringify({ membershipId: id, role }) });
+        loadMembers();
+      });
+    });
+    el.querySelectorAll("button[data-revoke]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        if (!confirm("Révoquer définitivement ce compte de l'établissement ?")) return;
+        btn.disabled = true;
+        await authFetch("/api/revoke-membership", { method: "POST", body: JSON.stringify({ membershipId: btn.dataset.revoke }) });
         loadMembers();
       });
     });
