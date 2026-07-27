@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>LockedAgentMac</string>
+    <key>CFBundleDisplayName</key>
+    <string>Locked</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.locked.agent</string>
+    <key>CFBundleExecutable</key>
+    <string>LockedAgentMac</string>
+    <key>CFBundleVersion</key>
+    <string>1.0</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>12.0</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <!-- Requis pour piloter Excel via AppleScript (voir ExcelController.swift) -->
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Locked a besoin de piloter Excel pour ouvrir et enregistrer votre copie d'examen.</string>
+</dict>
+</plist>

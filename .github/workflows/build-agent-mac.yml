@@ -1,0 +1,46 @@
+name: Build Mac Agent
+
+on:
+  push:
+    branches: [main, "claude/**"]
+    paths:
+      - "mac-agent/**"
+      - ".github/workflows/build-agent-mac.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        working-directory: mac-agent
+        run: swift build -c release
+
+      - name: Assemble .app bundle
+        working-directory: mac-agent
+        run: |
+          APP_NAME="LockedAgentMac"
+          BUNDLE="$APP_NAME.app"
+          rm -rf "$BUNDLE" "$APP_NAME.zip"
+          mkdir -p "$BUNDLE/Contents/MacOS"
+          mkdir -p "$BUNDLE/Contents/Resources"
+          cp ".build/release/$APP_NAME" "$BUNDLE/Contents/MacOS/$APP_NAME"
+          cp "Resources/Info.plist" "$BUNDLE/Contents/Info.plist"
+          ditto -c -k --sequesterRsrc --keepParent "$BUNDLE" "$APP_NAME.zip"
+
+      - name: Publish GitHub Release (rolling "latest" build)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        working-directory: mac-agent
+        run: |
+          gh release delete agent-mac-latest --yes --cleanup-tag || true
+          git tag -f agent-mac-latest
+          git push -f origin agent-mac-latest
+          gh release create agent-mac-latest LockedAgentMac.zip \
+            --title "Locked — Agent macOS (dernière version)" \
+            --notes "Build automatique depuis le commit ${{ github.sha }}."
