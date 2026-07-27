@@ -54,6 +54,9 @@
     color: white;
   }
   .btn:hover { background: var(--accent-hover); }
+  .btn.secondary { background: rgba(0, 0, 0, 0.06); color: var(--text); }
+  .btn.secondary:hover { background: rgba(0, 0, 0, 0.1); }
+  .download-buttons { display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; }
 
   @media (prefers-color-scheme: dark) {
     :root {
@@ -64,6 +67,8 @@
       --border: rgba(255, 255, 255, 0.09);
       --shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
     }
+    .btn.secondary { background: rgba(255, 255, 255, 0.1); color: var(--text); }
+    .btn.secondary:hover { background: rgba(255, 255, 255, 0.16); }
   }
 </style>
 </head>
@@ -80,19 +85,24 @@
     <p class="note">
       Pendant l'examen, Locked verrouille votre Excel en plein écran et bloque les
       raccourcis permettant de sortir de l'application — ce n'est possible qu'avec
-      une application installée sur votre PC Windows, pas depuis un navigateur.
+      une application installée sur votre PC (Windows ou Mac), pas depuis un navigateur.
     </p>
   </div>
 
   <div class="card">
     <h2>Comment rejoindre un examen</h2>
     <ol>
-      <li>Téléchargez et installez l'application Windows Locked ci-dessous.</li>
+      <li>Téléchargez et installez l'application Locked (Windows ou Mac) ci-dessous.</li>
       <li>Lancez l'application et saisissez le code de room communiqué par votre intervenant.</li>
       <li>Vous entrez dans une file d'attente : Excel s'ouvre en arrière-plan, non verrouillé.</li>
       <li>Dès que l'intervenant démarre l'examen, Excel passe en plein écran et la surveillance s'active automatiquement — pour tout le monde en même temps.</li>
       <li>À la fin de l'examen, votre copie est enregistrée et envoyée automatiquement.</li>
     </ol>
+    <p class="note" style="margin-top: 1rem;">
+      Sur Mac, l'application vous demandera d'autoriser l'accès à l'Accessibilité, à l'enregistrement
+      d'écran et le pilotage d'Excel au premier lancement — acceptez ces demandes, elles sont
+      nécessaires au bon fonctionnement de la surveillance.
+    </p>
   </div>
 
   <div class="card" style="text-align: center;">
@@ -100,7 +110,10 @@
     <p class="note" style="margin-bottom: 1rem;">
       Si aucune version n'est encore publiée, demandez le lien d'installation à votre intervenant.
     </p>
-    <a class="btn" href="https://github.com/corentin230604/locked/releases/latest/download/LockedAgent.exe">Télécharger pour Windows</a>
+    <div class="download-buttons">
+      <a class="btn" href="https://github.com/corentin230604/locked/releases/latest/download/LockedAgent.exe">Télécharger pour Windows</a>
+      <a class="btn secondary" href="https://github.com/corentin230604/locked/releases/latest/download/LockedAgentMac.zip">Télécharger pour Mac</a>
+    </div>
   </div>
 </div>
 </body>
