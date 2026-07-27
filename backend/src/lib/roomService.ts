@@ -38,6 +38,10 @@ export interface Room {
    * pre-multi-tenant flow keeps working unchanged). */
   schoolId: string | null;
   createdByMembershipId: string | null;
+  /** Distinct from `code` (the student join code) — lets another
+   * intervenant join as a ponctual co-organizer, see api/join-organizer.ts.
+   * Only generated for school-scoped rooms. */
+  coOrganizerCode: string | null;
   createdAt: string;
 }
 
@@ -98,6 +102,7 @@ function toRoom(row: any): Room {
     isTest: Boolean(row.is_test),
     schoolId: row.school_id,
     createdByMembershipId: row.created_by_membership_id,
+    coOrganizerCode: row.co_organizer_code,
     createdAt: row.created_at,
     config: {
       examTitle: row.exam_title,
@@ -140,9 +145,11 @@ export async function createRoom(
     },
   };
 
-  // Retry on the rare code collision (unique constraint on `code`).
+  // Retry on the rare code collision (unique constraint on `code` and, when
+  // school-scoped, `co_organizer_code` too).
   for (let attempt = 0; attempt < 5; attempt++) {
     const code = generateRoomCode();
+    const coOrganizerCode = schoolId ? generateRoomCode(8) : null;
     const { data, error } = await supabaseAdmin
       .from("rooms")
       .insert({
@@ -156,6 +163,7 @@ export async function createRoom(
         is_test: isTest,
         school_id: schoolId ?? null,
         created_by_membership_id: createdByMembershipId ?? null,
+        co_organizer_code: coOrganizerCode,
       })
       .select()
       .single();
@@ -240,6 +248,93 @@ export async function listRoomCoOrganizerIds(roomId: string): Promise<string[]> 
     .eq("room_id", roomId);
   if (error) throw error;
   return (data ?? []).map((row: any) => row.user_id);
+}
+
+export async function getRoomByCoOrganizerCode(code: string): Promise<Room | null> {
+  const { data, error } = await supabaseAdmin
+    .from("rooms")
+    .select()
+    .eq("co_organizer_code", code.toUpperCase())
+    .maybeSingle();
+  if (error) throw error;
+  return data ? toRoom(data) : null;
+}
+
+/** Every room an intervenant either created or was added to as a ponctual
+ * co-organizer, scoped to one school — feeds the intervenant space's
+ * "Historique" view. */
+export async function getRoomsForIntervenant(schoolId: string, membershipId: string, userId: string): Promise<Room[]> {
+  const [createdResult, coOrganizedResult] = await Promise.all([
+    supabaseAdmin
+      .from("rooms")
+      .select()
+      .eq("school_id", schoolId)
+      .eq("created_by_membership_id", membershipId),
+    supabaseAdmin.from("room_co_organizers").select("room_id").eq("user_id", userId),
+  ]);
+  if (createdResult.error) throw createdResult.error;
+  if (coOrganizedResult.error) throw coOrganizedResult.error;
+
+  const coOrganizedRoomIds = (coOrganizedResult.data ?? []).map((row: any) => row.room_id);
+  let coOrganizedRooms: any[] = [];
+  if (coOrganizedRoomIds.length > 0) {
+    const { data, error } = await supabaseAdmin
+      .from("rooms")
+      .select()
+      .eq("school_id", schoolId)
+      .in("id", coOrganizedRoomIds);
+    if (error) throw error;
+    coOrganizedRooms = data ?? [];
+  }
+
+  const byId = new Map<string, any>();
+  for (const row of [...(createdResult.data ?? []), ...coOrganizedRooms]) byId.set(row.id, row);
+  return Array.from(byId.values())
+    .map(toRoom)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
+
+/** A student's own room history across every school they've ever joined a
+ * room in — feeds the Windows agent's post-login dashboard. */
+export async function getSessionHistoryForMemberships(
+  membershipIds: string[]
+): Promise<Array<Session & { room: Room }>> {
+  if (membershipIds.length === 0) return [];
+  const { data, error } = await supabaseAdmin
+    .from("sessions")
+    .select("*, rooms(*)")
+    .in("membership_id", membershipIds)
+    .order("joined_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((row: any) => ({ ...toSession(row), room: toRoom(row.rooms) }));
+}
+
+export interface Violation {
+  id: string;
+  sessionId: string;
+  roomId: string;
+  type: ViolationType;
+  payload: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+/** Full event log for one room — Realtime only delivers *new* violations, so
+ * a finished room's history needs this REST snapshot instead. */
+export async function getViolationsForRoom(roomId: string): Promise<Violation[]> {
+  const { data, error } = await supabaseAdmin
+    .from("violations")
+    .select()
+    .eq("room_id", roomId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map((row: any) => ({
+    id: row.id,
+    sessionId: row.session_id,
+    roomId: row.room_id,
+    type: row.type,
+    payload: row.payload,
+    createdAt: row.created_at,
+  }));
 }
 
 export async function getSession(sessionId: string): Promise<Session | null> {

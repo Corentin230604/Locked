@@ -1,6 +1,11 @@
 import type { VercelRequest, VercelResponse } from "../src/lib/httpTypes";
 import { getCaller, isPlatformAdmin } from "../src/lib/authContext";
-import { computeEffectiveStatus, getSchoolById, listMembershipsForUser } from "../src/lib/schoolService";
+import {
+  computeEffectiveStatus,
+  getPerimeterById,
+  getSchoolById,
+  listMembershipsForUser,
+} from "../src/lib/schoolService";
 
 /**
  * The logged-in caller's own memberships, each annotated with its effective
@@ -24,9 +29,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const withStatus = await Promise.all(
     memberships.map(async (m) => {
       const school = await getSchoolById(m.schoolId);
+      const className = m.classPerimeterId ? (await getPerimeterById(m.classPerimeterId))?.name ?? null : null;
       return {
         ...m,
         schoolName: school?.name ?? "",
+        className,
         effectiveStatus: computeEffectiveStatus(m.validUntil, school?.defaultGracePeriodDays ?? 60),
       };
     })

@@ -88,6 +88,10 @@ create table rooms (
   is_test boolean not null default false,
   status text not null default 'open' check (status in ('open', 'closed')),
   school_id uuid references schools(id) on delete cascade,
+  -- Code distinct du code élève, permettant à un autre intervenant de
+  -- rejoindre une room comme co-organisateur/co-surveillant (partiels
+  -- multi-classes) - voir api/join-organizer.ts.
+  co_organizer_code text unique,
   created_by_membership_id uuid references school_memberships(id) on delete set null,
   created_at timestamptz not null default now()
 );

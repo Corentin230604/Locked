@@ -24,6 +24,10 @@ import renewMembershipHandler from "../api/renew-membership";
 import myMembershipsHandler from "../api/my-memberships";
 import schoolStatsHandler from "../api/school-stats";
 import schoolMembersHandler from "../api/school-members";
+import joinOrganizerHandler from "../api/join-organizer";
+import myRoomsHandler from "../api/my-rooms";
+import mySessionsHandler from "../api/my-sessions";
+import roomViolationsHandler from "../api/room-violations";
 import { runLifecycleSweep } from "./lib/lifecycleService";
 
 /**
@@ -76,6 +80,10 @@ mount("/api/renew-membership", renewMembershipHandler);
 mount("/api/my-memberships", myMembershipsHandler);
 mount("/api/school-stats", schoolStatsHandler);
 mount("/api/school-members", schoolMembersHandler);
+mount("/api/join-organizer", joinOrganizerHandler);
+mount("/api/my-rooms", myRoomsHandler);
+mount("/api/my-sessions", mySessionsHandler);
+mount("/api/room-violations", roomViolationsHandler);
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 function scheduleLifecycleSweep() {
