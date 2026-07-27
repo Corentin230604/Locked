@@ -1,0 +1,747 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Locked — Espace intervenant</title>
+<style>
+  :root {
+    --bg: #f5f5f7;
+    --card: #ffffff;
+    --text: #1d1d1f;
+    --text-secondary: #6e6e73;
+    --border: rgba(0, 0, 0, 0.07);
+    --shadow: 0 2px 10px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.03);
+    --accent: #0071e3;
+    --accent-hover: #0077ed;
+    --success: #1d8a3e;
+    --success-bg: #eafaf0;
+    --danger: #d70015;
+    --danger-bg: #fdecec;
+    --warning: #b25000;
+    --warning-bg: #fff2e3;
+    --info: #0071e3;
+    --radius-lg: 20px;
+    --radius-sm: 10px;
+    --radius-pill: 980px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+  .app { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+  a.back { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }
+  a.back:hover { color: var(--text); }
+
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    margin: 1.25rem 0 2rem; flex-wrap: wrap; gap: 1rem;
+  }
+  .brand { font-size: 1.4rem; font-weight: 700; letter-spacing: -0.02em; }
+  nav.tabs { display: flex; gap: 0.35rem; background: rgba(0,0,0,0.05); padding: 0.3rem; border-radius: var(--radius-pill); }
+  nav.tabs button {
+    border: none; background: transparent; padding: 0.5rem 1.1rem; border-radius: var(--radius-pill);
+    font-size: 0.88rem; font-weight: 500; cursor: pointer; color: var(--text-secondary);
+    font-family: inherit;
+  }
+  nav.tabs button.active { background: var(--card); color: var(--text); box-shadow: var(--shadow); }
+  .user-chip { font-size: 0.85rem; color: var(--text-secondary); display: flex; align-items: center; gap: 0.6rem; }
+  .user-chip button { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 0.85rem; font-family: inherit; padding: 0; }
+
+  .card {
+    background: var(--card);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    padding: 1.75rem;
+    margin-bottom: 1.25rem;
+  }
+  h2 { font-size: 1.15rem; font-weight: 600; margin: 0 0 1rem; letter-spacing: -0.01em; }
+  h3 { font-size: 1rem; font-weight: 600; margin: 0 0 0.85rem; letter-spacing: -0.01em; }
+  label { display: block; font-size: 0.85rem; color: var(--text-secondary); margin: 0.9rem 0 0.35rem; font-weight: 500; }
+  label:first-of-type { margin-top: 0; }
+  input, select {
+    width: 100%; padding: 0.6rem 0.8rem; border-radius: var(--radius-sm);
+    border: 1px solid var(--border); background: #fbfbfd; color: var(--text);
+    font-size: 0.95rem; font-family: inherit;
+  }
+  .row { display: flex; gap: 0.75rem; }
+  .row > * { flex: 1; }
+  .checkbox-row { display: flex; align-items: center; gap: 0.5rem; margin: 0.4rem 0; }
+  .checkbox-row input { width: auto; }
+  .checkbox-row label { margin: 0; }
+  button.action {
+    font-family: inherit; font-size: 0.95rem; font-weight: 500; cursor: pointer; border: none;
+    border-radius: var(--radius-pill); padding: 0.65rem 1.4rem;
+  }
+  button.primary { background: var(--accent); color: white; }
+  button.primary:hover { background: var(--accent-hover); }
+  button.secondary { background: rgba(0, 0, 0, 0.05); color: var(--text); }
+  button.danger { background: var(--danger-bg); color: var(--danger); padding: 0.4rem 0.9rem; font-size: 0.85rem; }
+  button.small { font-size: 0.8rem; padding: 0.35rem 0.9rem; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  .hidden { display: none !important; }
+
+  .view { display: none; }
+  .view.active { display: block; }
+
+  .shortcuts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: 1.25rem; }
+  @media (max-width: 640px) { .shortcuts { grid-template-columns: 1fr; } }
+  .shortcut {
+    background: #fbfbfd; border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 1.1rem; text-align: left; cursor: pointer; font-family: inherit;
+  }
+  .shortcut .title { font-weight: 600; margin-bottom: 0.2rem; }
+  .shortcut .desc { font-size: 0.82rem; color: var(--text-secondary); }
+
+  .room-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
+  .room-code-block { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+  .room-code { font-size: 1.6rem; font-weight: 700; letter-spacing: 0.08em; font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; }
+  code.co-code { background: rgba(0,113,227,0.1); color: var(--accent); padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.85rem; }
+  .lifecycle-badge { font-size: 0.75rem; font-weight: 600; padding: 0.25rem 0.7rem; border-radius: var(--radius-pill); }
+  .lifecycle-badge.waiting { color: var(--warning); background: var(--warning-bg); }
+  .lifecycle-badge.started { color: var(--success); background: var(--success-bg); }
+  .lifecycle-badge.ended { color: var(--text-secondary); background: rgba(0, 0, 0, 0.05); }
+  .lifecycle-badge.test { color: var(--warning); background: var(--warning-bg); border: 1px solid var(--warning); }
+
+  .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-top: 1.25rem; }
+  @media (max-width: 720px) { .dashboard-grid { grid-template-columns: 1fr; } }
+  .student, .submission, .room-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0.65rem 0.9rem; border-radius: var(--radius-sm); margin-bottom: 0.5rem;
+    background: #fbfbfd; border: 1px solid var(--border);
+  }
+  .room-row { flex-direction: column; align-items: stretch; cursor: pointer; }
+  .room-row .summary { display: flex; justify-content: space-between; align-items: center; }
+  .room-row .details { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border); font-size: 0.85rem; }
+  .badge { font-size: 0.75rem; font-weight: 600; padding: 0.15rem 0.55rem; border-radius: var(--radius-pill); }
+  .badge.active { color: var(--success); background: var(--success-bg); }
+  .badge.excluded { color: var(--danger); background: var(--danger-bg); }
+  .badge.disconnected, .badge.left { color: var(--text-secondary); background: rgba(0,0,0,0.05); }
+  .empty-state { color: var(--text-secondary); font-size: 0.9rem; padding: 0.5rem 0; }
+  #events { max-height: 50vh; overflow-y: auto; }
+  .event { font-size: 0.85rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
+  .event:last-child { border-bottom: none; }
+  .event .type { font-weight: 600; padding: 0.1rem 0.5rem; border-radius: var(--radius-pill); font-size: 0.72rem; margin-right: 0.4rem; }
+  .event .time { color: var(--text-secondary); font-size: 0.78rem; }
+  .type-focus_lost, .type-excluded { color: var(--danger); background: var(--danger-bg); }
+  .type-focus_returned, .type-joined, .type-submitted, .type-test_exit { color: var(--success); background: var(--success-bg); }
+  .type-screenshot { color: var(--info); background: #e8f2fd; }
+  .type-ai_flag, .type-disconnected { color: var(--warning); background: var(--warning-bg); }
+  .status-line { font-size: 0.85rem; color: var(--danger); margin-top: 0.75rem; min-height: 1.2em; }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #000000; --card: #1c1c1e; --text: #f5f5f7; --text-secondary: #9a9a9e;
+      --border: rgba(255, 255, 255, 0.09); --shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+    }
+    input, select { background: #2c2c2e; color: var(--text); }
+    button.secondary { background: rgba(255, 255, 255, 0.08); color: var(--text); }
+    .shortcut, .student, .submission, .room-row { background: #2c2c2e; }
+    nav.tabs { background: rgba(255,255,255,0.08); }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <a class="back" href="index.html">← Accueil</a>
+
+  <section id="loginCard" class="card" style="margin-top: 1.25rem;">
+    <h2>Connexion</h2>
+    <label for="emailBox">Email</label>
+    <input id="emailBox" type="email" />
+    <label for="passwordBox">Mot de passe</label>
+    <input id="passwordBox" type="password" />
+    <div style="margin-top: 1.1rem;">
+      <button class="action primary" id="loginBtn">Se connecter</button>
+    </div>
+    <p class="status-line" id="loginStatus"></p>
+  </section>
+
+  <section id="schoolPickerCard" class="card hidden">
+    <h2>Établissement</h2>
+    <select id="schoolPicker"></select>
+  </section>
+
+  <div id="mainSection" class="hidden">
+    <div class="topbar">
+      <div class="brand">Locked</div>
+      <nav class="tabs">
+        <button data-view="accueil" class="active">Accueil</button>
+        <button data-view="dashboard">Tableau de bord</button>
+        <button data-view="historique">Historique</button>
+        <button data-view="cocreer">Co-créer</button>
+      </nav>
+      <div class="user-chip">
+        <span id="userEmailDisplay"></span>
+        <button id="logoutBtn">Déconnexion</button>
+      </div>
+    </div>
+
+    <!-- Accueil -->
+    <div class="view active" id="view-accueil">
+      <div class="card">
+        <h2>Bienvenue</h2>
+        <p style="color: var(--text-secondary); margin: 0;">Que veux-tu faire ?</p>
+        <div class="shortcuts">
+          <button class="shortcut" data-goto="dashboard">
+            <div class="title">Créer une room</div>
+            <div class="desc">Lancer un nouvel examen surveillé</div>
+          </button>
+          <button class="shortcut" data-goto="historique">
+            <div class="title">Historique</div>
+            <div class="desc">Revoir tes examens passés</div>
+          </button>
+          <button class="shortcut" data-goto="cocreer">
+            <div class="title">Co-créer</div>
+            <div class="desc">Rejoindre la room d'un collègue</div>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tableau de bord -->
+    <div class="view" id="view-dashboard">
+      <div id="createRoomCard" class="card">
+        <h2>Créer une room</h2>
+        <label for="teacherName">Ton nom</label>
+        <input id="teacherName" placeholder="M. Dupont" />
+        <label for="examTitle">Intitulé de l'examen</label>
+        <input id="examTitle" placeholder="DS Excel" />
+        <label for="examFile">Fichier Excel à distribuer (optionnel)</label>
+        <input id="examFile" type="file" accept=".xlsx,.xls,.xlsm" />
+        <div class="row">
+          <div>
+            <label for="countdownSeconds">Compte à rebours (s)</label>
+            <input id="countdownSeconds" type="number" min="5" value="15" />
+          </div>
+          <div>
+            <label for="scheduledStartAt">Démarrage programmé (optionnel)</label>
+            <input id="scheduledStartAt" type="datetime-local" />
+          </div>
+        </div>
+        <label for="screenshotPerMinute">Système IA — captures par minute (1-60)</label>
+        <input id="screenshotPerMinute" type="number" min="1" max="60" value="10" />
+        <div class="checkbox-row">
+          <input id="aiEnabled" type="checkbox" checked />
+          <label for="aiEnabled">Activer l'analyse IA des captures</label>
+        </div>
+        <div class="checkbox-row">
+          <input id="isTestRoom" type="checkbox" />
+          <label for="isTestRoom">Room de test (bouton "Quitter le test" disponible côté élève)</label>
+        </div>
+
+        <label>Classes ciblées (optionnel — laisser vide = accessible à toute personne avec le code)</label>
+        <div id="classCheckboxes"><p class="empty-state">Aucune classe ne t'est assignée.</p></div>
+
+        <div style="margin-top: 1.25rem;">
+          <button class="action primary" id="createRoomBtn">Créer la room</button>
+        </div>
+        <p class="status-line" id="createStatus"></p>
+      </div>
+
+      <section id="liveRoomSection" class="hidden">
+        <div class="card room-header">
+          <div>
+            <div class="room-code-block">
+              <span class="room-code" id="roomCodeDisplay"></span>
+              <button class="action secondary small" id="copyCodeBtn">Copier</button>
+              <span class="lifecycle-badge" id="lifecycleBadge"></span>
+              <span class="lifecycle-badge test hidden" id="testBadge">TEST</span>
+            </div>
+            <div style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.3rem;" id="roomTitleDisplay"></div>
+            <div id="coOrganizerRow" class="hidden" style="margin-top: 0.4rem; font-size: 0.85rem; color: var(--text-secondary);">
+              Code co-organisateur : <code class="co-code" id="coOrganizerCodeDisplay"></code>
+              <span style="color: var(--text-secondary);"> (à partager avec un collègue via "Co-créer")</span>
+            </div>
+          </div>
+          <div>
+            <button class="action primary hidden" id="startExamBtn">Démarrer l'examen</button>
+            <button class="action danger hidden" id="endExamBtn">Terminer l'examen</button>
+            <button class="action secondary" id="backBtn">← Nouvelle room</button>
+          </div>
+        </div>
+
+        <div class="dashboard-grid">
+          <div class="card">
+            <h3>Étudiants</h3>
+            <div id="students"><p class="empty-state">En attente de connexions...</p></div>
+          </div>
+          <div class="card">
+            <h3>Journal des événements</h3>
+            <div id="events"><p class="empty-state">Aucun événement pour le moment.</p></div>
+          </div>
+        </div>
+
+        <div class="card hidden" id="submissionsCard">
+          <h3>Copies rendues</h3>
+          <div id="submissions"><p class="empty-state">En attente des copies...</p></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Historique -->
+    <div class="view" id="view-historique">
+      <div class="card">
+        <h2>Historique</h2>
+        <div id="roomHistory"><p class="empty-state">Chargement...</p></div>
+      </div>
+    </div>
+
+    <!-- Co-créer -->
+    <div class="view" id="view-cocreer">
+      <div class="card">
+        <h2>Rejoindre une room en tant qu'intervenant</h2>
+        <p style="color: var(--text-secondary); font-size: 0.9rem;">
+          Un collègue t'a partagé son code co-organisateur (différent du code élève) ?
+          Rejoins sa room en tant que co-surveillant, utile pour un partiel réparti sur plusieurs classes.
+        </p>
+        <label for="coOrganizerCodeInput">Code co-organisateur</label>
+        <input id="coOrganizerCodeInput" style="text-transform: uppercase;" />
+        <div style="margin-top: 1.25rem;">
+          <button class="action primary" id="joinOrganizerBtn">Rejoindre</button>
+        </div>
+        <p class="status-line" id="joinOrganizerStatus"></p>
+      </div>
+      <div class="card">
+        <h2>Créer une room à plusieurs</h2>
+        <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0;">
+          Crée ta room normalement dans "Tableau de bord" — un code co-organisateur est généré
+          automatiquement, à partager avec tes collègues pour qu'ils la rejoignent ici.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  const SUPABASE_URL = "https://kacjqpqppcqtdyebdpyi.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImthY2pxcHFwcGNxdGR5ZWJkcHlpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyMDQzNzAsImV4cCI6MjA5OTc4MDM3MH0.IoOLViEXo8JAHgF3QVlLiWDrIyUAq5_kGBisZjG8RpI";
+  const API_URL = "https://locked-j4y8.onrender.com";
+
+  const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const students = new Map();
+  let currentSchoolId = null;
+  let currentMembership = null;
+  let currentRoom = null;
+  let submissionsPollTimer = null;
+  let lifecycleTimer = null;
+
+  async function authFetch(path, options = {}) {
+    const { data } = await client.auth.getSession();
+    const token = data.session?.access_token;
+    const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    return fetch(`${API_URL}${path}`, { ...options, headers });
+  }
+
+  // --- Nav ---
+  document.querySelectorAll("nav.tabs button").forEach((btn) => {
+    btn.addEventListener("click", () => switchView(btn.dataset.view));
+  });
+  document.querySelectorAll("[data-goto]").forEach((btn) => {
+    btn.addEventListener("click", () => switchView(btn.dataset.goto));
+  });
+
+  function switchView(view) {
+    document.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
+    document.querySelectorAll("nav.tabs button").forEach((b) => b.classList.toggle("active", b.dataset.view === view));
+    $(`view-${view}`).classList.add("active");
+    if (view === "historique") loadHistory();
+  }
+
+  // --- Login ---
+  $("loginBtn").addEventListener("click", async () => {
+    $("loginStatus").textContent = "";
+    const email = $("emailBox").value.trim();
+    const password = $("passwordBox").value;
+    if (!email || !password) {
+      $("loginStatus").textContent = "Renseigne ton email et ton mot de passe.";
+      return;
+    }
+    const { error } = await client.auth.signInWithPassword({ email, password });
+    if (error) {
+      $("loginStatus").textContent = `Connexion impossible : ${error.message}`;
+      return;
+    }
+    await checkAccess(email);
+  });
+
+  $("logoutBtn").addEventListener("click", async () => {
+    await client.auth.signOut();
+    location.reload();
+  });
+
+  async function checkAccess(email) {
+    const res = await authFetch("/api/my-memberships");
+    if (!res.ok) {
+      $("loginStatus").textContent = "Session invalide, reconnecte-toi.";
+      return;
+    }
+    const { memberships } = await res.json();
+    const usable = memberships.filter((m) => m.role === "intervenant" || m.role === "school_admin");
+    if (usable.length === 0) {
+      $("loginStatus").textContent = "Ce compte n'est intervenant ni admin d'aucun établissement.";
+      return;
+    }
+
+    $("loginCard").classList.add("hidden");
+    $("userEmailDisplay").textContent = email || "";
+
+    if (usable.length === 1) {
+      selectSchool(usable[0]);
+      return;
+    }
+
+    $("schoolPickerCard").classList.remove("hidden");
+    const picker = $("schoolPicker");
+    picker.innerHTML = "";
+    for (const m of usable) {
+      const opt = document.createElement("option");
+      opt.value = m.schoolId;
+      opt.textContent = m.schoolName;
+      picker.appendChild(opt);
+    }
+    picker.addEventListener("change", () => selectSchool(usable.find((x) => x.schoolId === picker.value)));
+    selectSchool(usable[0]);
+  }
+
+  function selectSchool(membership) {
+    currentMembership = membership;
+    currentSchoolId = membership.schoolId;
+    $("mainSection").classList.remove("hidden");
+    loadMyClasses();
+  }
+
+  // --- Classes assignées (pour le ciblage a la creation) ---
+  let myClasses = [];
+  async function loadMyClasses() {
+    if (currentMembership.role !== "intervenant") {
+      myClasses = [];
+      renderClassCheckboxes();
+      return;
+    }
+    const res = await authFetch(`/api/intervenant-classes?membershipId=${encodeURIComponent(currentMembership.id)}`);
+    if (!res.ok) return;
+    const { classes } = await res.json();
+    myClasses = classes;
+    renderClassCheckboxes();
+  }
+
+  function renderClassCheckboxes() {
+    const el = $("classCheckboxes");
+    if (myClasses.length === 0) {
+      el.innerHTML = '<p class="empty-state">Aucune classe ne t\'est assignée.</p>';
+      return;
+    }
+    el.innerHTML = "";
+    for (const c of myClasses) {
+      const div = document.createElement("div");
+      div.className = "checkbox-row";
+      div.innerHTML = `<input type="checkbox" id="target-${c.id}" value="${c.id}" /><label for="target-${c.id}">${c.name}</label>`;
+      el.appendChild(div);
+    }
+  }
+
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(",")[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // --- Création de room ---
+  $("createRoomBtn").addEventListener("click", async () => {
+    $("createStatus").textContent = "";
+    const teacherName = $("teacherName").value.trim();
+    if (!teacherName) {
+      $("createStatus").textContent = "Renseigne ton nom.";
+      return;
+    }
+    const perMinute = Math.min(60, Math.max(1, Number($("screenshotPerMinute").value) || 10));
+    const config = {
+      examTitle: $("examTitle").value.trim() || "Examen",
+      countdownSeconds: Number($("countdownSeconds").value) || 15,
+      screenshot: { enabled: $("aiEnabled").checked, perMinute },
+    };
+    const scheduledStartAtLocal = $("scheduledStartAt").value;
+    const scheduledStartAt = scheduledStartAtLocal ? new Date(scheduledStartAtLocal).toISOString() : undefined;
+    const targetClassPerimeterIds = myClasses.map((c) => c.id).filter((id) => $(`target-${id}`)?.checked);
+
+    $("createStatus").textContent = "Création de la room...";
+    try {
+      const res = await authFetch("/api/rooms", {
+        method: "POST",
+        body: JSON.stringify({
+          teacherName, config, scheduledStartAt, isTest: $("isTestRoom").checked,
+          schoolId: currentSchoolId, targetClassPerimeterIds,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const room = await res.json();
+
+      const file = $("examFile").files[0];
+      if (file) {
+        $("createStatus").textContent = "Envoi du fichier Excel...";
+        const fileBase64 = await fileToBase64(file);
+        const uploadRes = await authFetch("/api/exam-file", {
+          method: "POST",
+          body: JSON.stringify({ roomId: room.id, fileBase64, filename: file.name }),
+        });
+        if (!uploadRes.ok) throw new Error(await uploadRes.text());
+        room.examFilePath = `${room.id}/${file.name}`;
+      }
+
+      $("createStatus").textContent = "";
+      openLiveRoom(room, []);
+    } catch (err) {
+      $("createStatus").textContent = `Impossible de créer la room : ${err.message}`;
+    }
+  });
+
+  // --- Tableau de bord en direct (repris de l'ancien dashboard.html) ---
+  function normalizeSession(s) {
+    return {
+      id: s.id,
+      room_id: s.room_id ?? s.roomId,
+      student_name: s.student_name ?? s.studentName,
+      status: s.status,
+      joined_at: s.joined_at ?? s.joinedAt,
+      last_seen: s.last_seen ?? s.lastSeen,
+    };
+  }
+
+  function computeLifecycle(scheduledStartAt, startedAt, endedAt) {
+    if (endedAt) return "ended";
+    if (startedAt) return "started";
+    if (scheduledStartAt && new Date(scheduledStartAt).getTime() <= Date.now()) return "started";
+    return "waiting";
+  }
+
+  function normalizeRoom(r) {
+    const scheduledStartAt = r.scheduled_start_at ?? r.scheduledStartAt ?? null;
+    const startedAt = r.started_at ?? r.startedAt ?? null;
+    const endedAt = r.ended_at ?? r.endedAt ?? null;
+    return {
+      id: r.id,
+      code: r.code,
+      status: r.status,
+      scheduledStartAt, startedAt, endedAt,
+      examFilePath: r.exam_file_path ?? r.examFilePath ?? null,
+      isTest: Boolean(r.is_test ?? r.isTest ?? false),
+      coOrganizerCode: r.co_organizer_code ?? r.coOrganizerCode ?? null,
+      config: r.config ?? {
+        examTitle: r.exam_title, countdownSeconds: r.countdown_seconds,
+        screenshot: { enabled: r.screenshot_enabled, perMinute: r.screenshot_per_minute },
+      },
+    };
+  }
+
+  function renderStudents() {
+    const el = $("students");
+    if (students.size === 0) {
+      el.innerHTML = '<p class="empty-state">En attente de connexions...</p>';
+      return;
+    }
+    el.innerHTML = "";
+    for (const [sessionId, s] of students) {
+      const div = document.createElement("div");
+      div.className = "student";
+      div.innerHTML = `<span>${s.student_name} <span class="badge ${s.status}">${s.status}</span></span>
+        <button class="action danger" data-id="${sessionId}">Exclure</button>`;
+      el.appendChild(div);
+    }
+    el.querySelectorAll("button[data-id]").forEach((btn) => {
+      btn.addEventListener("click", () => authFetch("/api/exclude", { method: "POST", body: JSON.stringify({ sessionId: btn.dataset.id }) }));
+    });
+  }
+
+  function logEvent(v) {
+    const el = $("events");
+    if (el.querySelector(".empty-state")) el.innerHTML = "";
+    const div = document.createElement("div");
+    div.className = "event";
+    const studentName = students.get(v.session_id)?.student_name ?? "";
+    const reason = v.type === "ai_flag" && v.payload?.reason ? ` — ${v.payload.reason}` : "";
+    div.innerHTML = `<span class="type type-${v.type}">${v.type}</span>${studentName} <span class="time">${new Date(v.created_at).toLocaleTimeString()}</span>${reason}`;
+    el.prepend(div);
+  }
+
+  function renderRoomState() {
+    if (!currentRoom) return;
+    const lifecycle = computeLifecycle(currentRoom.scheduledStartAt, currentRoom.startedAt, currentRoom.endedAt);
+    const badge = $("lifecycleBadge");
+    badge.className = `lifecycle-badge ${lifecycle}`;
+    badge.textContent = { waiting: "En attente", started: "En cours", ended: "Terminé" }[lifecycle];
+    $("testBadge").classList.toggle("hidden", !currentRoom.isTest);
+    $("startExamBtn").classList.toggle("hidden", lifecycle !== "waiting");
+    $("endExamBtn").classList.toggle("hidden", lifecycle !== "started");
+
+    const cfg = currentRoom.config;
+    const aiText = cfg.screenshot.enabled ? `IA activée (${cfg.screenshot.perMinute} captures/min)` : "IA désactivée";
+    $("roomTitleDisplay").textContent = cfg ? `${cfg.examTitle} — compte à rebours ${cfg.countdownSeconds}s — ${aiText}` : "";
+
+    if (currentRoom.coOrganizerCode) {
+      $("coOrganizerRow").classList.remove("hidden");
+      $("coOrganizerCodeDisplay").textContent = currentRoom.coOrganizerCode;
+    }
+
+    $("submissionsCard").classList.toggle("hidden", lifecycle !== "ended");
+    if (lifecycle === "ended") { loadSubmissions(); startSubmissionsPolling(); } else { stopSubmissionsPolling(); }
+  }
+
+  function startLifecycleTimer() { stopLifecycleTimer(); lifecycleTimer = setInterval(renderRoomState, 5000); }
+  function stopLifecycleTimer() { if (lifecycleTimer) clearInterval(lifecycleTimer); lifecycleTimer = null; }
+
+  function renderSubmissions(list) {
+    const el = $("submissions");
+    if (!list || list.length === 0) { el.innerHTML = '<p class="empty-state">Aucune copie reçue pour le moment.</p>'; return; }
+    el.innerHTML = "";
+    for (const s of list) {
+      const div = document.createElement("div");
+      div.className = "submission";
+      div.innerHTML = s.url
+        ? `<span>${s.studentName}</span><a href="${s.url}" target="_blank" rel="noopener">Télécharger</a>`
+        : `<span>${s.studentName}</span><span style="color: var(--text-secondary); font-size: 0.85rem;">en attente...</span>`;
+      el.appendChild(div);
+    }
+  }
+
+  async function loadSubmissions() {
+    if (!currentRoom) return;
+    const res = await authFetch(`/api/submission?code=${encodeURIComponent(currentRoom.code)}`);
+    if (!res.ok) return;
+    const { submissions } = await res.json();
+    renderSubmissions(submissions);
+  }
+  function startSubmissionsPolling() { if (submissionsPollTimer) return; submissionsPollTimer = setInterval(loadSubmissions, 5000); }
+  function stopSubmissionsPolling() { if (submissionsPollTimer) clearInterval(submissionsPollTimer); submissionsPollTimer = null; }
+
+  function openLiveRoom(room, sessions) {
+    currentRoom = normalizeRoom(room);
+    students.clear();
+    for (const s of sessions) { const n = normalizeSession(s); students.set(n.id, n); }
+
+    $("roomCodeDisplay").textContent = currentRoom.code;
+    $("createRoomCard").classList.add("hidden");
+    $("liveRoomSection").classList.remove("hidden");
+    renderStudents();
+    renderRoomState();
+    startLifecycleTimer();
+    $("events").innerHTML = '<p class="empty-state">Aucun événement pour le moment.</p>';
+
+    const rtClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    rtClient.channel(`room-${currentRoom.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "sessions", filter: `room_id=eq.${currentRoom.id}` },
+        (payload) => { if (payload.new?.id) { students.set(payload.new.id, payload.new); renderStudents(); } })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "violations", filter: `room_id=eq.${currentRoom.id}` },
+        (payload) => logEvent(payload.new))
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "rooms", filter: `id=eq.${currentRoom.id}` },
+        (payload) => { currentRoom = normalizeRoom(payload.new); renderRoomState(); })
+      .subscribe();
+  }
+
+  $("backBtn").addEventListener("click", () => {
+    currentRoom = null;
+    students.clear();
+    stopLifecycleTimer();
+    stopSubmissionsPolling();
+    $("liveRoomSection").classList.add("hidden");
+    $("createRoomCard").classList.remove("hidden");
+  });
+
+  $("copyCodeBtn").addEventListener("click", async () => {
+    if (!currentRoom) return;
+    await navigator.clipboard.writeText(currentRoom.code);
+  });
+
+  $("startExamBtn").addEventListener("click", async () => {
+    await authFetch("/api/start", { method: "POST", body: JSON.stringify({ roomId: currentRoom.id }) });
+    currentRoom.startedAt = new Date().toISOString();
+    renderRoomState();
+  });
+  $("endExamBtn").addEventListener("click", async () => {
+    await authFetch("/api/end", { method: "POST", body: JSON.stringify({ roomId: currentRoom.id }) });
+    currentRoom.endedAt = new Date().toISOString();
+    renderRoomState();
+  });
+
+  // --- Historique ---
+  async function loadHistory() {
+    const el = $("roomHistory");
+    el.innerHTML = '<p class="empty-state">Chargement...</p>';
+    const res = await authFetch(`/api/my-rooms?schoolId=${encodeURIComponent(currentSchoolId)}`);
+    if (!res.ok) { el.innerHTML = '<p class="empty-state">Impossible de charger l\'historique.</p>'; return; }
+    const { rooms } = await res.json();
+    if (rooms.length === 0) { el.innerHTML = '<p class="empty-state">Aucune room pour le moment.</p>'; return; }
+    el.innerHTML = "";
+    for (const room of rooms) {
+      const div = document.createElement("div");
+      div.className = "room-row";
+      const lifecycle = computeLifecycle(room.scheduledStartAt, room.startedAt, room.endedAt);
+      div.innerHTML = `
+        <div class="summary">
+          <span>${room.config.examTitle} <span class="meta" style="color: var(--text-secondary); font-size: 0.82rem;">— ${new Date(room.createdAt).toLocaleDateString()}</span></span>
+          <span class="lifecycle-badge ${lifecycle}">${{ waiting: "En attente", started: "En cours", ended: "Terminé" }[lifecycle]}</span>
+        </div>
+        <div class="details hidden"></div>
+      `;
+      div.addEventListener("click", () => toggleRoomDetails(div, room));
+      el.appendChild(div);
+    }
+  }
+
+  async function toggleRoomDetails(div, room) {
+    const details = div.querySelector(".details");
+    const isHidden = details.classList.contains("hidden");
+    if (!isHidden) { details.classList.add("hidden"); return; }
+    details.classList.remove("hidden");
+    if (details.dataset.loaded) return;
+    details.dataset.loaded = "1";
+    details.textContent = "Chargement...";
+
+    const [sessionsRes, violationsRes] = await Promise.all([
+      authFetch(`/api/sessions?code=${encodeURIComponent(room.code)}`),
+      authFetch(`/api/room-violations?roomId=${encodeURIComponent(room.id)}`),
+    ]);
+    const sessions = sessionsRes.ok ? (await sessionsRes.json()).sessions : [];
+    const violations = violationsRes.ok ? (await violationsRes.json()).violations : [];
+
+    const studentsHtml = sessions.length
+      ? sessions.map((s) => `<div>${s.studentName ?? s.student_name} — ${s.status}</div>`).join("")
+      : '<div class="empty-state">Aucun élève.</div>';
+    const eventsHtml = violations.length
+      ? violations.map((v) => `<div><span class="type type-${v.type}">${v.type}</span> ${new Date(v.createdAt).toLocaleString()}</div>`).join("")
+      : '<div class="empty-state">Aucun événement.</div>';
+
+    details.innerHTML = `
+      <strong>Code :</strong> ${room.code}${room.coOrganizerCode ? ` · <strong>Co-organisateur :</strong> ${room.coOrganizerCode}` : ""}<br/>
+      <div style="margin-top: 0.6rem;"><strong>Étudiants</strong>${studentsHtml}</div>
+      <div style="margin-top: 0.6rem;"><strong>Événements</strong>${eventsHtml}</div>
+    `;
+  }
+
+  // --- Co-créer ---
+  $("joinOrganizerBtn").addEventListener("click", async () => {
+    $("joinOrganizerStatus").textContent = "";
+    const code = $("coOrganizerCodeInput").value.trim().toUpperCase();
+    if (!code) { $("joinOrganizerStatus").textContent = "Renseigne un code."; return; }
+    const res = await authFetch("/api/join-organizer", { method: "POST", body: JSON.stringify({ coOrganizerCode: code }) });
+    if (!res.ok) { $("joinOrganizerStatus").textContent = `Impossible de rejoindre : ${await res.text()}`; return; }
+    const room = await res.json();
+    $("joinOrganizerStatus").textContent = "";
+    switchView("dashboard");
+    openLiveRoom(room, []);
+  });
+</script>
+</body>
+</html>
