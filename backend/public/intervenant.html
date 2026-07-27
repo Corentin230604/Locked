@@ -51,6 +51,8 @@
   nav.tabs button.active { background: var(--card); color: var(--text); box-shadow: var(--shadow); }
   .user-chip { font-size: 0.85rem; color: var(--text-secondary); display: flex; align-items: center; gap: 0.6rem; }
   .user-chip button { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 0.85rem; font-family: inherit; padding: 0; }
+  .user-chip a { color: var(--accent); text-decoration: none; }
+  .user-chip a:hover { text-decoration: underline; }
 
   .card {
     background: var(--card);
@@ -177,6 +179,7 @@
         <button data-view="cocreer">Co-créer</button>
       </nav>
       <div class="user-chip">
+        <a id="manageSchoolLink" href="#" class="hidden">Gérer l'établissement</a>
         <span id="userEmailDisplay"></span>
         <button id="logoutBtn">Déconnexion</button>
       </div>
@@ -385,10 +388,15 @@
       $("loginStatus").textContent = "Session invalide, reconnecte-toi.";
       return;
     }
-    const { memberships } = await res.json();
+    const { memberships, isPlatformAdmin } = await res.json();
     const usable = memberships.filter((m) => m.role === "intervenant" || m.role === "school_admin");
     if (usable.length === 0) {
-      $("loginStatus").textContent = "Ce compte n'est intervenant ni admin d'aucun établissement.";
+      if (isPlatformAdmin) {
+        $("loginStatus").innerHTML = 'Ce compte est super-admin plateforme — <a href="admin.html">accéder à l\'espace super-admin</a>.';
+        $("loginStatus").style.color = "var(--text-secondary)";
+      } else {
+        $("loginStatus").textContent = "Ce compte n'est intervenant ni admin d'aucun établissement.";
+      }
       return;
     }
 
@@ -416,6 +424,13 @@
   function selectSchool(membership) {
     currentMembership = membership;
     currentSchoolId = membership.schoolId;
+    const manageLink = $("manageSchoolLink");
+    if (membership.role === "school_admin") {
+      manageLink.href = `school-admin.html?schoolId=${encodeURIComponent(currentSchoolId)}`;
+      manageLink.classList.remove("hidden");
+    } else {
+      manageLink.classList.add("hidden");
+    }
     $("mainSection").classList.remove("hidden");
     loadMyClasses();
   }
