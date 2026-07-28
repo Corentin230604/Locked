@@ -145,11 +145,23 @@ final class JoinWindowController: NSWindowController {
                 }
             }
 
-            guard let token = await SupabaseAuth.signIn(email: email, password: password) else {
-                statusLabel.stringValue =
-                    registerMode
-                    ? "Email ou mot de passe incorrect."
-                    : "Email ou mot de passe incorrect. Si vous n'avez pas encore de compte, cliquez sur « Créer un compte » ci-dessous."
+            let (token, emailNotConfirmed) = await SupabaseAuth.signIn(email: email, password: password)
+            guard let token = token else {
+                if emailNotConfirmed {
+                    // Registration now requires a real click-through
+                    // confirmation (see register-student.ts) — this is the
+                    // expected first sign-in attempt right after creating
+                    // the account, not an error with the password.
+                    statusLabel.stringValue =
+                        registerMode
+                        ? "Compte créé ! Un email de confirmation vous a été envoyé — cliquez sur le lien qu'il contient avant de pouvoir vous connecter."
+                        : "Votre email n'est pas encore confirmé. Vérifiez votre boîte mail et cliquez sur le lien reçu lors de l'inscription."
+                } else {
+                    statusLabel.stringValue =
+                        registerMode
+                        ? "Email ou mot de passe incorrect."
+                        : "Email ou mot de passe incorrect. Si vous n'avez pas encore de compte, cliquez sur « Créer un compte » ci-dessous."
+                }
                 return
             }
 

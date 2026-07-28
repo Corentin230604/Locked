@@ -16,7 +16,10 @@ enum SupabaseAuth {
         }
     }
 
-    static func signIn(email: String, password: String) async -> String? {
+    /// (jwt, emailNotConfirmed) — the second is only ever true alongside a
+    /// nil jwt, distinguishing "you haven't clicked your confirmation link
+    /// yet" (see register-student.ts) from a genuinely wrong email/password.
+    static func signIn(email: String, password: String) async -> (jwt: String?, emailNotConfirmed: Bool) {
         var request = URLRequest(url: URL(string: "\(url)/auth/v1/token?grant_type=password")!)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -24,12 +27,19 @@ enum SupabaseAuth {
         request.httpBody = try? JSONSerialization.data(withJSONObject: ["email": email, "password": password])
 
         guard let (data, response) = try? await URLSession.shared.data(for: request),
-            let http = response as? HTTPURLResponse, http.statusCode == 200,
-            let token = try? JSONDecoder().decode(TokenResponse.self, from: data)
+            let http = response as? HTTPURLResponse
         else {
-            return nil
+            return (nil, false)
         }
-        return token.accessToken
+        if http.statusCode != 200 {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            let notConfirmed = body.range(of: "not confirmed", options: .caseInsensitive) != nil
+            return (nil, notConfirmed)
+        }
+        guard let token = try? JSONDecoder().decode(TokenResponse.self, from: data) else {
+            return (nil, false)
+        }
+        return (token.accessToken, false)
     }
 }
 

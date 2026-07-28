@@ -80,16 +80,29 @@ public partial class JoinWindow : Window
                 }
             }
 
-            var jwt = await SignInAsync(http, email, password);
+            var (jwt, emailNotConfirmed) = await SignInAsync(http, email, password);
             if (jwt is null)
             {
-                // Supabase never distinguishes "no account" from "wrong
-                // password" (avoids leaking which emails are registered), so
-                // this message can't tell which case it is either - it just
-                // nudges toward the actual fix for a first-time student.
-                StatusText.Text = _registerMode
-                    ? "Email ou mot de passe incorrect."
-                    : "Email ou mot de passe incorrect. Si vous n'avez pas encore de compte, cliquez sur « Créer un compte » ci-dessous.";
+                if (emailNotConfirmed)
+                {
+                    // Registration now requires a real click-through
+                    // confirmation (see register-student.ts) — this is the
+                    // expected first sign-in attempt right after creating
+                    // the account, not an error with the password.
+                    StatusText.Text = _registerMode
+                        ? "Compte créé ! Un email de confirmation vous a été envoyé — cliquez sur le lien qu'il contient avant de pouvoir vous connecter."
+                        : "Votre email n'est pas encore confirmé. Vérifiez votre boîte mail et cliquez sur le lien reçu lors de l'inscription.";
+                }
+                else
+                {
+                    // Supabase never distinguishes "no account" from "wrong
+                    // password" (avoids leaking which emails are registered), so
+                    // this message can't tell which case it is either - it just
+                    // nudges toward the actual fix for a first-time student.
+                    StatusText.Text = _registerMode
+                        ? "Email ou mot de passe incorrect."
+                        : "Email ou mot de passe incorrect. Si vous n'avez pas encore de compte, cliquez sur « Créer un compte » ci-dessous.";
+                }
                 return;
             }
             http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
@@ -107,7 +120,10 @@ public partial class JoinWindow : Window
         }
     }
 
-    private static async Task<string?> SignInAsync(HttpClient http, string email, string password)
+    /// <summary>Returns (jwt, emailNotConfirmed) — the second is only ever
+    /// true alongside a null jwt, distinguishing "you haven't clicked your
+    /// confirmation link yet" from a genuinely wrong email/password.</summary>
+    private static async Task<(string? Jwt, bool EmailNotConfirmed)> SignInAsync(HttpClient http, string email, string password)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, $"{SupabaseUrl}/auth/v1/token?grant_type=password")
         {
@@ -116,10 +132,15 @@ public partial class JoinWindow : Window
         request.Headers.Add("apikey", SupabaseAnonKey);
 
         var response = await http.SendAsync(request);
-        if (!response.IsSuccessStatusCode) return null;
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorBody = await response.Content.ReadAsStringAsync();
+            var notConfirmed = errorBody.Contains("not confirmed", StringComparison.OrdinalIgnoreCase);
+            return (null, notConfirmed);
+        }
 
         var body = await response.Content.ReadFromJsonAsync<SupabaseAuthResponse>(JsonOptions);
-        return body?.AccessToken;
+        return (body?.AccessToken, false);
     }
 
     /// <summary>Backend errors are JSON `{ error: "..." }` — show that
