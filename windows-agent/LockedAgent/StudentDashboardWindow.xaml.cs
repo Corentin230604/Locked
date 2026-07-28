@@ -58,6 +58,7 @@ public partial class StudentDashboardWindow : Window
         "excluded" => "Exclu",
         "disconnected" => "Déconnecté",
         "left" => "Terminé",
+        "pending_approval" => "En attente d'autorisation",
         _ => status,
     };
 

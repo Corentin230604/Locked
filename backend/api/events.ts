@@ -12,6 +12,8 @@ const AGENT_EVENT_TYPES: ViolationType[] = [
   "excluded",
   "disconnected",
   "test_exit",
+  "environment_violation_detected",
+  "environment_violation_cleared",
 ];
 
 /** Agent -> backend event relay (focus lost/returned, self-excluded on

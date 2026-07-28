@@ -21,17 +21,26 @@ public sealed class BackendClient : IAsyncDisposable
     private readonly CancellationTokenSource _cts = new();
     private Task? _pollTask;
     private string _lastLifecycle;
+    private string _lastStatus;
 
     public event Action? Excluded;
     public event Action? RoomStarted;
     public event Action? RoomEnded;
 
-    public BackendClient(HttpClient http, string baseUrl, string sessionId, string initialLifecycle)
+    /// <summary>Teacher let this student in from the airlock — see
+    /// roomService.approveEntry() on the backend.</summary>
+    public event Action? EntryApproved;
+
+    /// <summary>Teacher refused this student at the airlock.</summary>
+    public event Action? EntryDenied;
+
+    public BackendClient(HttpClient http, string baseUrl, string sessionId, string initialLifecycle, string initialStatus = "active")
     {
         _http = http;
         _baseUrl = baseUrl.TrimEnd('/');
         _sessionId = sessionId;
         _lastLifecycle = initialLifecycle;
+        _lastStatus = initialStatus;
     }
 
     public Task SendEventAsync(string type, object? payload = null)
@@ -95,6 +104,22 @@ public sealed class BackendClient : IAsyncDisposable
                 {
                     Excluded?.Invoke();
                     return;
+                }
+
+                if (_lastStatus == "pending_approval" && session.Status != _lastStatus)
+                {
+                    _lastStatus = session.Status;
+                    if (session.Status == "active")
+                    {
+                        EntryApproved?.Invoke();
+                    }
+                    else
+                    {
+                        // "left" (denied) or anything else — either way this
+                        // student isn't getting into the room.
+                        EntryDenied?.Invoke();
+                        return;
+                    }
                 }
 
                 var lifecycle = session.Room?.Lifecycle ?? _lastLifecycle;

@@ -92,7 +92,9 @@ export type ViolationType =
   | "test_exit"
   | "entry_requested"
   | "entry_approved"
-  | "entry_denied";
+  | "entry_denied"
+  | "environment_violation_detected"
+  | "environment_violation_cleared";
 
 const ROOM_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0/O/1/I
 

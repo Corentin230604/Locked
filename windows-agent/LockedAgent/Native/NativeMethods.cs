@@ -58,6 +58,15 @@ internal static class NativeMethods
     [DllImport("kernel32.dll", CharSet = CharSet.Auto)]
     public static extern IntPtr GetModuleHandle(string? lpModuleName);
 
+    [DllImport("user32.dll")]
+    public static extern int GetSystemMetrics(int nIndex);
+
+    /// <summary>Number of display monitors on the system — used by
+    /// EnvironmentWatcher to detect a second screen plugged in during an
+    /// exam. Avoids pulling in System.Windows.Forms (a WinForms assembly)
+    /// just for Screen.AllScreens.</summary>
+    public const int SM_CMONITORS = 80;
+
     public const int WH_KEYBOARD_LL = 13;
     public const int WM_KEYDOWN = 0x0100;
     public const int WM_SYSKEYDOWN = 0x0104;

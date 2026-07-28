@@ -187,6 +187,7 @@ final class StudentDashboardWindowController: NSWindowController {
         case "excluded": return "Exclu"
         case "disconnected": return "Déconnecté"
         case "left": return "Terminé"
+        case "pending_approval": return "En attente d'autorisation"
         default: return status
         }
     }

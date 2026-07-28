@@ -166,9 +166,9 @@
   .event .type { font-weight: 600; padding: 0.1rem 0.5rem; border-radius: var(--radius-pill); font-size: 0.72rem; margin-right: 0.4rem; }
   .event .time { color: var(--text-secondary); font-size: 0.78rem; }
   .type-focus_lost, .type-excluded, .type-entry_denied { color: var(--danger); background: var(--danger-bg); }
-  .type-focus_returned, .type-joined, .type-submitted, .type-entry_approved { color: var(--success); background: var(--success-bg); }
+  .type-focus_returned, .type-joined, .type-submitted, .type-entry_approved, .type-environment_violation_cleared { color: var(--success); background: var(--success-bg); }
   .type-screenshot, .type-entry_requested { color: var(--info); background: #e8f2fd; }
-  .type-ai_flag, .type-disconnected { color: var(--warning); background: var(--warning-bg); }
+  .type-ai_flag, .type-disconnected, .type-environment_violation_detected { color: var(--warning); background: var(--warning-bg); }
   .type-test_exit { color: var(--text-secondary); background: rgba(0, 0, 0, 0.05); }
 
   .status-line { font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.75rem; min-height: 1.2em; }
@@ -581,7 +581,11 @@
     const div = document.createElement("div");
     div.className = "event";
     const studentName = students.get(v.session_id)?.student_name ?? "";
-    const reason = v.type === "ai_flag" && v.payload?.reason ? ` — ${v.payload.reason}` : "";
+    const isEnvEvent = v.type === "environment_violation_detected" || v.type === "environment_violation_cleared";
+    const reason =
+      v.type === "ai_flag" && v.payload?.reason ? ` — ${v.payload.reason}`
+      : isEnvEvent && v.payload?.message ? ` — ${v.payload.message}`
+      : "";
     div.innerHTML = `<span class="type type-${v.type}">${v.type}</span>${studentName} <span class="time">${new Date(v.created_at).toLocaleTimeString()}</span>${reason}`;
     el.prepend(div);
   }

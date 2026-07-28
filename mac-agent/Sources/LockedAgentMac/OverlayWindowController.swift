@@ -6,11 +6,19 @@ final class OverlayWindowController: NSWindowController {
     private let countdownLabel = NSTextField(labelWithString: "")
     private var remaining: Int
     private var timer: Timer?
+    private let title: String
+    private let subtitle: String
 
     var onCountdownExpired: (() -> Void)?
 
-    init(countdownSeconds: Int) {
+    init(
+        countdownSeconds: Int,
+        title: String = "Vous avez quitté Excel",
+        subtitle: String = "Revenez immédiatement, sinon vous serez exclu de l'examen"
+    ) {
         remaining = countdownSeconds
+        self.title = title
+        self.subtitle = subtitle
         let screenFrame = NSScreen.main?.frame ?? NSRect(x: 0, y: 0, width: 800, height: 600)
         let window = NSWindow(
             contentRect: screenFrame,
@@ -36,12 +44,12 @@ final class OverlayWindowController: NSWindowController {
         let content = NSView(frame: contentView.bounds)
         content.autoresizingMask = [.width, .height]
 
-        let titleLabel = NSTextField(labelWithString: "Vous avez quitté Excel")
+        let titleLabel = NSTextField(wrappingLabelWithString: title)
         titleLabel.font = .boldSystemFont(ofSize: 36)
         titleLabel.textColor = .white
         titleLabel.alignment = .center
 
-        let subtitleLabel = NSTextField(labelWithString: "Revenez immédiatement, sinon vous serez exclu de l'examen")
+        let subtitleLabel = NSTextField(wrappingLabelWithString: subtitle)
         subtitleLabel.font = .systemFont(ofSize: 18)
         subtitleLabel.textColor = .white
         subtitleLabel.alignment = .center

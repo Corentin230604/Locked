@@ -9,12 +9,12 @@
         ResizeMode="NoResize">
     <Grid>
         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-            <TextBlock Text="Vous avez quitté Excel"
+            <TextBlock x:Name="TitleText" Text="Vous avez quitté Excel"
                        FontSize="42" FontWeight="Bold" Foreground="White"
-                       HorizontalAlignment="Center"/>
-            <TextBlock Text="Revenez immédiatement, sinon vous serez exclu de l'examen"
+                       HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"/>
+            <TextBlock x:Name="SubtitleText" Text="Revenez immédiatement, sinon vous serez exclu de l'examen"
                        FontSize="20" Foreground="White" Margin="0,10,0,30"
-                       HorizontalAlignment="Center"/>
+                       HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"/>
             <TextBlock x:Name="CountdownText"
                        FontSize="96" FontWeight="Bold" Foreground="White"
                        HorizontalAlignment="Center"/>

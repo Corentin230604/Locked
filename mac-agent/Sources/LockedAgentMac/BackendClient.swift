@@ -8,18 +8,24 @@ final class BackendClient {
     private let baseURL: String
     private let sessionId: String
     private var lastLifecycle: String
+    private var lastStatus: String
     private let authToken: String
     private var pollTask: Task<Void, Never>?
 
     var onExcluded: (() -> Void)?
     var onRoomStarted: (() -> Void)?
     var onRoomEnded: (() -> Void)?
+    /// Teacher let this student in from the airlock.
+    var onEntryApproved: (() -> Void)?
+    /// Teacher refused this student at the airlock.
+    var onEntryDenied: (() -> Void)?
 
-    init(baseURL: String, sessionId: String, initialLifecycle: String, authToken: String) {
+    init(baseURL: String, sessionId: String, initialLifecycle: String, authToken: String, initialStatus: String = "active") {
         self.baseURL = baseURL
         self.sessionId = sessionId
         self.lastLifecycle = initialLifecycle
         self.authToken = authToken
+        self.lastStatus = initialStatus
     }
 
     private func makeRequest(path: String, method: String = "GET", body: [String: Any]? = nil) -> URLRequest {
@@ -86,6 +92,18 @@ final class BackendClient {
                 if status.status == "excluded" {
                     onExcluded?()
                     return
+                }
+
+                if lastStatus == "pending_approval" && status.status != lastStatus {
+                    lastStatus = status.status
+                    if status.status == "active" {
+                        onEntryApproved?()
+                    } else {
+                        // "left" (denied) or anything else — either way this
+                        // student isn't getting into the room.
+                        onEntryDenied?()
+                        return
+                    }
                 }
 
                 let lifecycle = status.room?.lifecycle ?? lastLifecycle

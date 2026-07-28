@@ -33,6 +33,11 @@ public sealed class JoinResponse
     /// floating "Quitter le test" button stays available — see
     /// ExamSession.LockDown().</summary>
     public bool IsTest { get; set; }
+
+    /// <summary>"active" normally, or "pending_approval" when joining after
+    /// the room has already started — the agent must wait at the airlock
+    /// (see AirlockWindow) instead of locking down immediately.</summary>
+    public string Status { get; set; } = "active";
 }
 
 public sealed class RoomStatus

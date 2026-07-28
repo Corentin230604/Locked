@@ -18,8 +18,12 @@ final class ExamSession {
     private var focusWatcher: FocusWatcher?
     private var keyboardBlocker: KeyboardBlocker?
     private var screenshotService: ScreenshotService?
+    private var environmentWatcher: EnvironmentWatcher?
     private var overlay: OverlayWindowController?
+    private var envOverlay: OverlayWindowController?
+    private var activeEnvReasons: Set<String> = []
     private var waitingWindow: WaitingWindowController?
+    private var airlockWindow: AirlockWindowController?
     private var testExitWindow: TestExitWindowController?
     private var heartbeatTask: Task<Void, Never>?
     private var locked = false
@@ -29,7 +33,8 @@ final class ExamSession {
         self.join = join
         self.authToken = authToken
         self.backend = BackendClient(
-            baseURL: baseUrl, sessionId: join.sessionId, initialLifecycle: join.lifecycle, authToken: authToken)
+            baseURL: baseUrl, sessionId: join.sessionId, initialLifecycle: join.lifecycle,
+            authToken: authToken, initialStatus: join.status)
     }
 
     func start() async {
@@ -41,6 +46,12 @@ final class ExamSession {
         }
         backend.onRoomEnded = { [weak self] in
             Task { await self?.endExam() }
+        }
+        backend.onEntryApproved = { [weak self] in
+            DispatchQueue.main.async { self?.lockDown() }
+        }
+        backend.onEntryDenied = { [weak self] in
+            DispatchQueue.main.async { self?.denyEntry() }
         }
         backend.startPolling()
 
@@ -61,13 +72,35 @@ final class ExamSession {
             }
         }
 
-        if join.lifecycle == "started" {
+        if join.status == "pending_approval" {
+            let airlock = AirlockWindowController(examTitle: join.config.examTitle)
+            airlock.showWindow(nil)
+            airlockWindow = airlock
+        } else if join.lifecycle == "started" {
             lockDown()
         } else {
             let waiting = WaitingWindowController(examTitle: join.config.examTitle)
             waiting.showWindow(nil)
             waitingWindow = waiting
         }
+    }
+
+    /// Teacher refused this student at the airlock — nothing was ever armed,
+    /// so there's nothing to disarm, just close the window and quit like any
+    /// other refused entry.
+    private func denyEntry() {
+        airlockWindow?.window?.close()
+        airlockWindow = nil
+        heartbeatTask?.cancel()
+        excel.quit()
+        backend.stopPolling()
+
+        let alert = NSAlert()
+        alert.messageText = "Locked"
+        alert.informativeText = "Votre entrée dans la room n'a pas été autorisée par l'intervenant."
+        alert.alertStyle = .warning
+        alert.runModal()
+        NSApp.terminate(nil)
     }
 
     /// Arms every surveillance system at once: fullscreen, focus watcher,
@@ -79,6 +112,8 @@ final class ExamSession {
 
         waitingWindow?.window?.close()
         waitingWindow = nil
+        airlockWindow?.window?.close()
+        airlockWindow = nil
 
         excel.enterFullscreenLockdown()
 
@@ -97,6 +132,16 @@ final class ExamSession {
             baseUrl: baseUrl, sessionId: join.sessionId, authToken: authToken, perMinute: perMinute)
         screenshots.start()
         screenshotService = screenshots
+
+        let envWatcher = EnvironmentWatcher()
+        envWatcher.onViolationDetected = { [weak self] reason, message in
+            DispatchQueue.main.async { self?.onEnvironmentViolationDetected(reason: reason, message: message) }
+        }
+        envWatcher.onViolationCleared = { [weak self] reason in
+            DispatchQueue.main.async { self?.onEnvironmentViolationCleared(reason: reason) }
+        }
+        envWatcher.start()
+        environmentWatcher = envWatcher
 
         if join.isTest {
             let testExit = TestExitWindowController()
@@ -123,6 +168,39 @@ final class ExamSession {
 
     private func onCountdownExpired() {
         Task { await backend.sendEvent(type: "excluded", payload: ["reason": "countdown_expired"]) }
+        exclude()
+    }
+
+    /// Multiple reasons (e.g. a second monitor AND a forbidden app) can be
+    /// active at once — the overlay/countdown stays up as long as any one of
+    /// them is, and only the first one to appear starts it.
+    private func onEnvironmentViolationDetected(reason: String, message: String) {
+        activeEnvReasons.insert(reason)
+        Task { await backend.sendEvent(type: "environment_violation_detected", payload: ["reason": reason, "message": message]) }
+
+        guard envOverlay == nil else { return }
+        let overlayController = OverlayWindowController(
+            countdownSeconds: join.config.countdownSeconds,
+            title: message,
+            subtitle: "Corrigez la situation immédiatement, sinon vous serez exclu de l'examen")
+        overlayController.onCountdownExpired = { [weak self] in self?.onEnvironmentCountdownExpired() }
+        overlayController.showWindow(nil)
+        overlayController.startCountdown()
+        envOverlay = overlayController
+    }
+
+    private func onEnvironmentViolationCleared(reason: String) {
+        activeEnvReasons.remove(reason)
+        Task { await backend.sendEvent(type: "environment_violation_cleared", payload: ["reason": reason]) }
+
+        if activeEnvReasons.isEmpty {
+            envOverlay?.cancelCountdown()
+            envOverlay = nil
+        }
+    }
+
+    private func onEnvironmentCountdownExpired() {
+        Task { await backend.sendEvent(type: "excluded", payload: ["reason": "environment_violation"]) }
         exclude()
     }
 
@@ -162,9 +240,14 @@ final class ExamSession {
         keyboardBlocker?.uninstall()
         focusWatcher?.uninstall()
         screenshotService?.stop()
+        environmentWatcher?.stop()
         heartbeatTask?.cancel()
         overlay?.cancelCountdown()
+        envOverlay?.cancelCountdown()
+        activeEnvReasons.removeAll()
         waitingWindow?.window?.close()
+        airlockWindow?.window?.close()
+        airlockWindow = nil
         testExitWindow?.window?.close()
         testExitWindow = nil
     }

@@ -24,6 +24,10 @@ struct JoinResponse: Codable {
     /// All restrictions apply exactly as in a real exam, but a floating
     /// "Quitter le test" button stays available.
     var isTest: Bool
+    /// "active" normally, or "pending_approval" when joining after the room
+    /// has already started — the agent must wait at the airlock (see
+    /// AirlockWindowController) instead of locking down immediately.
+    var status: String
 }
 
 struct RoomStatus: Codable {

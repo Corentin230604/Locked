@@ -10,11 +10,13 @@ public partial class OverlayWindow : Window
 
     public event Action? CountdownExpired;
 
-    public OverlayWindow(int countdownSeconds)
+    public OverlayWindow(int countdownSeconds, string? title = null, string? subtitle = null)
     {
         InitializeComponent();
         _remaining = countdownSeconds;
         CountdownText.Text = _remaining.ToString();
+        if (title is not null) TitleText.Text = title;
+        if (subtitle is not null) SubtitleText.Text = subtitle;
         _timer.Tick += OnTick;
     }
 

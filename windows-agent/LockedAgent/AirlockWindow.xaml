@@ -1,0 +1,27 @@
+<Window x:Class="LockedAgent.AirlockWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Locked" Width="420" SizeToContent="Height"
+        WindowStartupLocation="CenterScreen" ResizeMode="NoResize"
+        Topmost="True"
+        Background="{StaticResource BackgroundBrush}"
+        FontFamily="Segoe UI">
+    <Grid Margin="28">
+        <Border Background="{StaticResource CardBrush}" CornerRadius="16"
+                Padding="24" BorderBrush="#EAEAEC" BorderThickness="1">
+            <StackPanel VerticalAlignment="Center">
+                <TextBlock Text="En attente d'autorisation" FontSize="20" FontWeight="Bold"
+                           Foreground="{StaticResource TextBrush}" HorizontalAlignment="Center"
+                           TextWrapping="Wrap" TextAlignment="Center"/>
+                <TextBlock x:Name="ExamTitleText" FontSize="13"
+                           Foreground="{StaticResource TextSecondaryBrush}"
+                           HorizontalAlignment="Center" Margin="0,6,0,0" TextWrapping="Wrap"
+                           TextAlignment="Center"/>
+                <TextBlock Text="L'examen a déjà commencé. L'intervenant doit valider votre entrée avant que vous puissiez rejoindre la room — patientez, cette fenêtre se fermera automatiquement dès sa décision."
+                           FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"
+                           HorizontalAlignment="Center" Margin="0,18,0,0" TextWrapping="Wrap"
+                           TextAlignment="Center"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

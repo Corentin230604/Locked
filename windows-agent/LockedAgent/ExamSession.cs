@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
 using System.Windows;
@@ -25,8 +26,12 @@ public sealed class ExamSession
     private FocusWatcher? _focusWatcher;
     private KeyboardHook? _keyboardHook;
     private ScreenshotService? _screenshotService;
+    private EnvironmentWatcher? _environmentWatcher;
     private OverlayWindow? _overlay;
+    private OverlayWindow? _envOverlay;
+    private readonly HashSet<string> _activeEnvReasons = new();
     private WaitingWindow? _waitingWindow;
+    private AirlockWindow? _airlockWindow;
     private TestExitWindow? _testExitWindow;
     private DispatcherTimer? _heartbeatTimer;
     private bool _locked;
@@ -43,10 +48,12 @@ public sealed class ExamSession
 
     public async Task StartAsync()
     {
-        _backend = new BackendClient(_http, _baseUrl, _join.SessionId, _join.Lifecycle);
+        _backend = new BackendClient(_http, _baseUrl, _join.SessionId, _join.Lifecycle, _join.Status);
         _backend.Excluded += () => Application.Current.Dispatcher.Invoke(Exclude);
         _backend.RoomStarted += () => Application.Current.Dispatcher.Invoke(LockDown);
         _backend.RoomEnded += () => Application.Current.Dispatcher.Invoke(() => _ = EndExamAsync());
+        _backend.EntryApproved += () => Application.Current.Dispatcher.Invoke(LockDown);
+        _backend.EntryDenied += () => Application.Current.Dispatcher.Invoke(DenyEntry);
         _backend.StartPolling();
 
         string? examFilePath = null;
@@ -67,7 +74,12 @@ public sealed class ExamSession
         _heartbeatTimer.Tick += async (_, _) => await _backend.SendHeartbeatAsync();
         _heartbeatTimer.Start();
 
-        if (_join.Lifecycle == "started")
+        if (_join.Status == "pending_approval")
+        {
+            _airlockWindow = new AirlockWindow(_join.Config.ExamTitle);
+            _airlockWindow.Show();
+        }
+        else if (_join.Lifecycle == "started")
         {
             LockDown();
         }
@@ -76,6 +88,22 @@ public sealed class ExamSession
             _waitingWindow = new WaitingWindow(_join.Config.ExamTitle);
             _waitingWindow.Show();
         }
+    }
+
+    /// <summary>Teacher refused this student at the airlock — nothing was
+    /// ever armed, so there's nothing to disarm, just close the window and
+    /// quit like any other refused entry.</summary>
+    private void DenyEntry()
+    {
+        _airlockWindow?.Close();
+        _airlockWindow = null;
+        _heartbeatTimer?.Stop();
+        _launcher?.Dispose();
+        _ = _backend?.DisposeAsync();
+        MessageBox.Show(
+            "Votre entrée dans la room n'a pas été autorisée par l'intervenant.",
+            "Locked", MessageBoxButton.OK, MessageBoxImage.Warning);
+        Application.Current.Shutdown();
     }
 
     /// <summary>Arms every surveillance system at once: fullscreen, focus
@@ -89,6 +117,8 @@ public sealed class ExamSession
 
         _waitingWindow?.Close();
         _waitingWindow = null;
+        _airlockWindow?.Close();
+        _airlockWindow = null;
 
         _launcher.EnterFullscreenLockdown();
 
@@ -102,6 +132,13 @@ public sealed class ExamSession
         _screenshotService = new ScreenshotService(
             _http, _baseUrl, _join.SessionId, _join.Config.Screenshot);
         _screenshotService.Start();
+
+        _environmentWatcher = new EnvironmentWatcher();
+        _environmentWatcher.ViolationDetected += (reason, message) =>
+            Application.Current.Dispatcher.Invoke(() => OnEnvironmentViolationDetected(reason, message));
+        _environmentWatcher.ViolationCleared += (reason) =>
+            Application.Current.Dispatcher.Invoke(() => OnEnvironmentViolationCleared(reason));
+        _environmentWatcher.Start();
 
         if (_join.IsTest)
         {
@@ -151,6 +188,41 @@ public sealed class ExamSession
         Exclude();
     }
 
+    /// <summary>Multiple reasons (e.g. a second monitor AND a forbidden app)
+    /// can be active at once — the overlay/countdown stays up as long as any
+    /// one of them is, and only the first one to appear starts it.</summary>
+    private void OnEnvironmentViolationDetected(string reason, string message)
+    {
+        _activeEnvReasons.Add(reason);
+        _ = _backend!.SendEventAsync("environment_violation_detected", new { reason, message });
+
+        if (_envOverlay is not null) return;
+        _envOverlay = new OverlayWindow(
+            _join.Config.CountdownSeconds, message,
+            "Corrigez la situation immédiatement, sinon vous serez exclu de l'examen");
+        _envOverlay.CountdownExpired += OnEnvironmentCountdownExpired;
+        _envOverlay.Show();
+        _envOverlay.StartCountdown();
+    }
+
+    private void OnEnvironmentViolationCleared(string reason)
+    {
+        _activeEnvReasons.Remove(reason);
+        _ = _backend!.SendEventAsync("environment_violation_cleared", new { reason });
+
+        if (_activeEnvReasons.Count == 0)
+        {
+            _envOverlay?.CancelCountdown();
+            _envOverlay = null;
+        }
+    }
+
+    private void OnEnvironmentCountdownExpired()
+    {
+        _ = _backend!.SendEventAsync("excluded", new { reason = "environment_violation" });
+        Exclude();
+    }
+
     /// <summary>Teacher clicked "Terminer l'examen": disarm everything, save
     /// the workbook to a path we control, and upload it — see
     /// api/submission.ts on the backend.</summary>
@@ -193,9 +265,14 @@ public sealed class ExamSession
         _keyboardHook?.Dispose();
         _focusWatcher?.Dispose();
         _screenshotService?.Dispose();
+        _environmentWatcher?.Dispose();
         _heartbeatTimer?.Stop();
         _overlay?.CancelCountdown();
+        _envOverlay?.CancelCountdown();
+        _activeEnvReasons.Clear();
         _waitingWindow?.Close();
+        _airlockWindow?.Close();
+        _airlockWindow = null;
         _testExitWindow?.Close();
         _testExitWindow = null;
     }
