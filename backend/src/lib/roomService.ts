@@ -45,7 +45,11 @@ export interface Room {
   createdAt: string;
 }
 
-export type SessionStatus = "active" | "excluded" | "disconnected" | "left";
+/** "pending_approval" is the airlock: a session created after the room has
+ * already started sits here until a teacher approves or denies it (see
+ * joinRoom()/approveEntry()/denyEntry()) — anyone who joined before the
+ * start skips straight to "active", exactly as before this existed. */
+export type SessionStatus = "active" | "excluded" | "disconnected" | "left" | "pending_approval";
 
 /** Set together with `leftAt` the moment a session reaches a terminal state
  * — "completed" is the only non-anomalous one (room ended while the student
@@ -55,7 +59,9 @@ export type ExitReason =
   | "manual_exclusion"
   | "focus_timeout"
   | "heartbeat_timeout"
-  | "test_exit";
+  | "test_exit"
+  | "denied_entry"
+  | "environment_violation";
 
 export interface Session {
   id: string;
@@ -83,7 +89,10 @@ export type ViolationType =
   | "joined"
   | "submitted"
   | "disconnected"
-  | "test_exit";
+  | "test_exit"
+  | "entry_requested"
+  | "entry_approved"
+  | "entry_denied";
 
 const ROOM_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0/O/1/I
 
@@ -222,6 +231,13 @@ export async function joinRoom(
   const room = await getRoomByCode(code);
   if (!room || room.status !== "open") return null;
 
+  // Anyone already here before the teacher clicked "Démarrer l'examen"
+  // enters directly, exactly as before this existed. Once the room has
+  // started, a new joiner is held at an airlock instead — no one can just
+  // walk into an exam already in progress without the teacher noticing and
+  // saying yes.
+  const requiresApproval = room.lifecycle === "started";
+
   const { data, error } = await supabaseAdmin
     .from("sessions")
     .insert({
@@ -229,14 +245,38 @@ export async function joinRoom(
       student_name: studentName,
       membership_id: membershipId ?? null,
       join_ip: joinIp ?? null,
+      status: requiresApproval ? "pending_approval" : "active",
     })
     .select()
     .single();
   if (error) throw error;
 
   const session = toSession(data);
-  await recordViolation(session.id, room.id, "joined", { studentName });
+  await recordViolation(session.id, room.id, requiresApproval ? "entry_requested" : "joined", { studentName });
   return { room, session };
+}
+
+/** Teacher lets a pending joiner into the room — the agent discovers this by
+ * polling (see api/session.ts) and locks down immediately since the room is
+ * necessarily already "started" for a session to have ended up pending. */
+export async function approveEntry(sessionId: string): Promise<Session | null> {
+  const session = await getSession(sessionId);
+  if (!session || session.status !== "pending_approval") return null;
+  const { error } = await supabaseAdmin.from("sessions").update({ status: "active" }).eq("id", sessionId);
+  if (error) throw error;
+  await recordViolation(sessionId, session.roomId, "entry_approved", {});
+  return session;
+}
+
+/** Teacher refuses a pending joiner — a deliberate decision, distinct from
+ * an exclusion (which implies the student was already in and did something
+ * wrong) and from a test exit (which implies no wrongdoing at all). */
+export async function denyEntry(sessionId: string): Promise<Session | null> {
+  const session = await getSession(sessionId);
+  if (!session || session.status !== "pending_approval") return null;
+  await finalizeSessionExit(sessionId, "left", "denied_entry");
+  await recordViolation(sessionId, session.roomId, "entry_denied", {});
+  return session;
 }
 
 /** Classes a room targets — empty means no class restriction (the
@@ -498,7 +538,9 @@ export async function runSessionTimeoutSweep(): Promise<{ disconnected: number }
   const { data, error } = await supabaseAdmin
     .from("sessions")
     .select("id, room_id")
-    .eq("status", "active")
+    // "pending_approval" included too — a student who crashes while waiting
+    // at the airlock shouldn't sit there forever with no exit reason either.
+    .in("status", ["active", "pending_approval"])
     .is("left_at", null)
     .lt("last_seen", cutoff);
   if (error) throw error;

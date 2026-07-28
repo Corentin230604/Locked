@@ -93,5 +93,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     lifecycle: result.room.lifecycle,
     examFileAvailable: Boolean(result.room.examFilePath),
     isTest: result.room.isTest,
+    // "pending_approval" when joining after the room has started — the
+    // agent must wait at the airlock instead of locking down immediately.
+    status: result.session.status,
   });
 }

@@ -133,6 +133,7 @@
   .badge.excluded { color: var(--danger); background: var(--danger-bg); }
   .badge.disconnected, .badge.left { color: var(--text-secondary); background: rgba(0,0,0,0.05); }
   .badge.disconnected { color: var(--warning); background: var(--warning-bg); }
+  .badge.pending_approval { color: var(--accent); background: rgba(0,113,227,0.1); }
   .empty-state { color: var(--text-secondary); font-size: 0.9rem; padding: 0.5rem 0; }
 
   .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 1rem; }
@@ -150,9 +151,9 @@
   .event:last-child { border-bottom: none; }
   .event .type { font-weight: 600; padding: 0.1rem 0.5rem; border-radius: var(--radius-pill); font-size: 0.72rem; margin-right: 0.4rem; }
   .event .time { color: var(--text-secondary); font-size: 0.78rem; }
-  .type-focus_lost, .type-excluded { color: var(--danger); background: var(--danger-bg); }
-  .type-focus_returned, .type-joined, .type-submitted, .type-test_exit { color: var(--success); background: var(--success-bg); }
-  .type-screenshot { color: var(--info); background: #e8f2fd; }
+  .type-focus_lost, .type-excluded, .type-entry_denied { color: var(--danger); background: var(--danger-bg); }
+  .type-focus_returned, .type-joined, .type-submitted, .type-test_exit, .type-entry_approved { color: var(--success); background: var(--success-bg); }
+  .type-screenshot, .type-entry_requested { color: var(--info); background: #e8f2fd; }
   .type-ai_flag, .type-disconnected { color: var(--warning); background: var(--warning-bg); }
   .status-line { font-size: 0.85rem; color: var(--danger); margin-top: 0.75rem; min-height: 1.2em; }
 
@@ -571,16 +572,21 @@
   // this is what lets the badge read "Exclu (manuel)" vs "Exclu (hors
   // focus)" instead of just the raw "excluded" both share.
   function exitLabel(s) {
+    if (s.status === "pending_approval") return { text: "Demande d'entrée", cls: "pending_approval" };
     if (s.status === "active") {
       return s.exit_reason === "completed" ? { text: "Terminé", cls: "active" } : { text: "En cours", cls: "active" };
     }
     if (s.status === "excluded") {
-      return s.exit_reason === "manual_exclusion"
-        ? { text: "Exclu (manuel)", cls: "excluded" }
-        : { text: "Exclu (hors focus)", cls: "excluded" };
+      if (s.exit_reason === "manual_exclusion") return { text: "Exclu (manuel)", cls: "excluded" };
+      if (s.exit_reason === "environment_violation") return { text: "Exclu (environnement)", cls: "excluded" };
+      return { text: "Exclu (hors focus)", cls: "excluded" };
     }
     if (s.status === "disconnected") return { text: "Déconnecté", cls: "disconnected" };
-    if (s.status === "left") return { text: s.exit_reason === "test_exit" ? "Sortie test" : "Sorti", cls: "left" };
+    if (s.status === "left") {
+      if (s.exit_reason === "test_exit") return { text: "Sortie test", cls: "left" };
+      if (s.exit_reason === "denied_entry") return { text: "Entrée refusée", cls: "left" };
+      return { text: "Sorti", cls: "left" };
+    }
     return { text: s.status, cls: s.status };
   }
 
@@ -640,12 +646,17 @@
     for (const [sessionId, s] of students) {
       const label = exitLabel(s);
       const leftText = s.left_at ? new Date(s.left_at).toLocaleTimeString() : "—";
+      const pending = s.status === "pending_approval";
+      const actionsHtml = pending
+        ? `<button class="action primary" data-approve="${sessionId}">Autoriser</button>
+           <button class="action danger" data-deny="${sessionId}">Refuser</button>`
+        : `<button class="action danger" data-id="${sessionId}">Exclure</button>`;
       const div = document.createElement("div");
       div.className = "student";
       div.innerHTML = `
         <div class="row-top">
           <span class="name" data-open="${sessionId}">${s.student_name} <span class="badge ${label.cls}">${label.text}</span></span>
-          <button class="action danger" data-id="${sessionId}">Exclure</button>
+          <span>${actionsHtml}</span>
         </div>
         <div class="row-meta">Entrée ${new Date(s.joined_at).toLocaleTimeString()} · Sortie ${leftText} · Durée ${formatDuration(s.joined_at, s.left_at)} · ${entryModeLabel(s)}</div>
       `;
@@ -655,6 +666,18 @@
       btn.addEventListener("click", (e) => {
         e.stopPropagation();
         authFetch("/api/exclude", { method: "POST", body: JSON.stringify({ sessionId: btn.dataset.id }) });
+      });
+    });
+    el.querySelectorAll("button[data-approve]").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        authFetch("/api/approve-entry", { method: "POST", body: JSON.stringify({ sessionId: btn.dataset.approve }) });
+      });
+    });
+    el.querySelectorAll("button[data-deny]").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        authFetch("/api/deny-entry", { method: "POST", body: JSON.stringify({ sessionId: btn.dataset.deny }) });
       });
     });
     el.querySelectorAll("[data-open]").forEach((span) => {

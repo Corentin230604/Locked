@@ -34,6 +34,8 @@ import revokeMembershipHandler from "../api/revoke-membership";
 import schoolNetworkHandler from "../api/school-network";
 import roomScreenshotsHandler from "../api/room-screenshots";
 import sessionDetailHandler from "../api/session-detail";
+import approveEntryHandler from "../api/approve-entry";
+import denyEntryHandler from "../api/deny-entry";
 import { runLifecycleSweep } from "./lib/lifecycleService";
 import { runSessionTimeoutSweep } from "./lib/roomService";
 
@@ -97,6 +99,8 @@ mount("/api/revoke-membership", revokeMembershipHandler);
 mount("/api/school-network", schoolNetworkHandler);
 mount("/api/room-screenshots", roomScreenshotsHandler);
 mount("/api/session-detail", sessionDetailHandler);
+mount("/api/approve-entry", approveEntryHandler);
+mount("/api/deny-entry", denyEntryHandler);
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 function scheduleLifecycleSweep() {

@@ -37,10 +37,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (type === "excluded") {
-    // The agent only ever self-reports "excluded" for one reason: the focus
-    // countdown expired. A teacher-initiated exclusion goes through
+    // The agent self-reports "excluded" for two distinct countdowns: the
+    // focus-loss overlay (reason "countdown_expired") and the environment
+    // watcher's own overlay (multiple monitors / a forbidden app still
+    // running once its countdown expires — reason is neither of the
+    // countdown reasons above). A teacher-initiated exclusion goes through
     // api/exclude.ts instead, which records "manual_exclusion" directly.
-    await finalizeSessionExit(sessionId, "excluded", "focus_timeout");
+    const reason = payload?.reason === "countdown_expired" ? "focus_timeout" : "environment_violation";
+    await finalizeSessionExit(sessionId, "excluded", reason);
   } else if (type === "disconnected") {
     await finalizeSessionExit(sessionId, "disconnected", "heartbeat_timeout");
   } else if (type === "test_exit") {
