@@ -139,11 +139,17 @@
   .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-top: 1.25rem; }
   @media (max-width: 720px) { .dashboard-grid { grid-template-columns: 1fr; } }
 
-  .student, .submission {
+  .submission {
     display: flex; justify-content: space-between; align-items: center;
     padding: 0.65rem 0.9rem; border-radius: var(--radius-sm); margin-bottom: 0.5rem;
     background: #fbfbfd; border: 1px solid var(--border);
   }
+  .student {
+    padding: 0.65rem 0.9rem; border-radius: var(--radius-sm); margin-bottom: 0.5rem;
+    background: #fbfbfd; border: 1px solid var(--border);
+  }
+  .student .row-top { display: flex; justify-content: space-between; align-items: center; }
+  .student .row-meta { font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.3rem; }
   .badge {
     font-size: 0.75rem; font-weight: 600; padding: 0.15rem 0.55rem; border-radius: var(--radius-pill);
   }
@@ -500,6 +506,32 @@
   });
 
   // --- Dashboard rendering ---
+  // Same status can mean different things depending on why it happened —
+  // this is what lets the badge read "Exclu (manuel)" vs "Exclu (hors
+  // focus)" instead of just the raw "excluded" both share.
+  function exitLabel(s) {
+    if (s.status === "active") {
+      return s.exit_reason === "completed" ? { text: "Terminé", cls: "active" } : { text: "En cours", cls: "active" };
+    }
+    if (s.status === "excluded") {
+      return s.exit_reason === "manual_exclusion"
+        ? { text: "Exclu (manuel)", cls: "excluded" }
+        : { text: "Exclu (hors focus)", cls: "excluded" };
+    }
+    if (s.status === "disconnected") return { text: "Déconnecté", cls: "disconnected" };
+    if (s.status === "left") return { text: s.exit_reason === "test_exit" ? "Sortie test" : "Sorti", cls: "left" };
+    return { text: s.status, cls: s.status };
+  }
+
+  function formatDuration(startIso, endIso) {
+    const start = new Date(startIso).getTime();
+    const end = endIso ? new Date(endIso).getTime() : Date.now();
+    const totalSec = Math.max(0, Math.round((end - start) / 1000));
+    const min = Math.floor(totalSec / 60);
+    const sec = totalSec % 60;
+    return min > 0 ? `${min} min ${String(sec).padStart(2, "0")}s` : `${sec}s`;
+  }
+
   function renderStudents() {
     const el = $("students");
     if (students.size === 0) {
@@ -508,11 +540,16 @@
     }
     el.innerHTML = "";
     for (const [sessionId, s] of students) {
+      const label = exitLabel(s);
+      const leftText = s.left_at ? new Date(s.left_at).toLocaleTimeString() : "—";
       const div = document.createElement("div");
       div.className = "student";
       div.innerHTML = `
-        <span>${s.student_name} <span class="badge ${s.status}">${s.status}</span></span>
-        <button class="danger" data-id="${sessionId}">Exclure</button>
+        <div class="row-top">
+          <span>${s.student_name} <span class="badge ${label.cls}">${label.text}</span></span>
+          <button class="danger" data-id="${sessionId}">Exclure</button>
+        </div>
+        <div class="row-meta">Entrée ${new Date(s.joined_at).toLocaleTimeString()} · Sortie ${leftText} · Durée ${formatDuration(s.joined_at, s.left_at)}</div>
       `;
       el.appendChild(div);
     }
@@ -553,6 +590,8 @@
       status: s.status,
       joined_at: s.joined_at ?? s.joinedAt,
       last_seen: s.last_seen ?? s.lastSeen,
+      left_at: s.left_at ?? s.leftAt ?? null,
+      exit_reason: s.exit_reason ?? s.exitReason ?? null,
     };
   }
 

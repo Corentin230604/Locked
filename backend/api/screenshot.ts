@@ -46,7 +46,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const analysis = await analyzeScreenshot(imageBuffer);
   if (analysis && analysis.anomaly && analysis.confidence >= AI_FLAG_CONFIDENCE_THRESHOLD) {
-    await recordViolation(sessionId, session.roomId, "ai_flag", { ...analysis });
+    // `path` lets the teacher dashboard link straight to the exact image
+    // that triggered the flag (see api/room-screenshots.ts) instead of just
+    // showing the text reason with no visual evidence to back it up.
+    await recordViolation(sessionId, session.roomId, "ai_flag", { ...analysis, path });
   }
 
   res.status(201).json({ ok: true });

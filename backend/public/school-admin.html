@@ -49,7 +49,7 @@
   h2 { font-size: 1.1rem; font-weight: 600; margin: 0 0 1rem; letter-spacing: -0.01em; }
   label { display: block; font-size: 0.85rem; color: var(--text-secondary); margin: 0.9rem 0 0.35rem; font-weight: 500; }
   label:first-of-type { margin-top: 0; }
-  input, select {
+  input, select, textarea {
     width: 100%;
     padding: 0.6rem 0.8rem;
     border-radius: var(--radius-sm);
@@ -59,6 +59,7 @@
     font-size: 0.95rem;
     font-family: inherit;
   }
+  textarea { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 0.85rem; resize: vertical; }
   .row { display: flex; gap: 0.75rem; }
   .row > * { flex: 1; }
   .checkbox-row { display: flex; align-items: center; gap: 0.5rem; margin: 0.4rem 0; }
@@ -118,7 +119,7 @@
       --border: rgba(255, 255, 255, 0.09);
       --shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
     }
-    input, select { background: #2c2c2e; color: var(--text); }
+    input, select, textarea { background: #2c2c2e; color: var(--text); }
     .row-item { background: #2c2c2e; }
   }
 </style>
@@ -150,6 +151,20 @@
 
   <section id="adminSection" class="hidden">
     <div class="breadcrumb" id="breadcrumb"></div>
+
+    <div class="card hidden" id="networkCard">
+      <h2>Réseau autorisé</h2>
+      <p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0 0 0.9rem;">
+        Restreint la connexion aux rooms de cet établissement au réseau de l'école (une élève hors de ce réseau ne
+        peut pas rejoindre, même avec le bon code et la bonne classe). Une plage par ligne, au format IP ou CIDR
+        (ex. <code>203.0.113.4</code> ou <code>203.0.113.0/24</code>). Laisser vide pour n'imposer aucune restriction.
+      </p>
+      <textarea id="allowedIpRanges" rows="3" placeholder="203.0.113.0/24"></textarea>
+      <div style="margin-top: 1.1rem;">
+        <button class="primary" id="saveNetworkBtn">Enregistrer</button>
+      </div>
+      <p class="status-line" id="networkStatus"></p>
+    </div>
 
     <div class="card">
       <h2 id="perimetersTitle">Environnements</h2>
@@ -309,7 +324,40 @@
     $("adminSection").classList.remove("hidden");
     loadPerimeters();
     loadMembers();
+    loadNetworkConfig();
   }
+
+  // --- Réseau autorisé (restriction IP a l'echelle de l'ecole) ---
+  async function loadNetworkConfig() {
+    // Reserved for a full-school admin or the platform admin — same rule
+    // api/school-network.ts enforces — a scoped campus/department admin
+    // can't see or touch a restriction that applies to the whole école.
+    $("networkCard").classList.toggle("hidden", !canManage());
+    if (!canManage()) return;
+    const res = await authFetch(`/api/school-network?schoolId=${encodeURIComponent(currentSchoolId)}`);
+    if (!res.ok) return;
+    const { allowedIpRanges } = await res.json();
+    $("allowedIpRanges").value = (allowedIpRanges || []).join("\n");
+  }
+
+  $("saveNetworkBtn").addEventListener("click", async () => {
+    $("networkStatus").textContent = "";
+    const allowedIpRanges = $("allowedIpRanges").value
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+    const res = await authFetch(`/api/school-network?schoolId=${encodeURIComponent(currentSchoolId)}`, {
+      method: "PUT",
+      body: JSON.stringify({ allowedIpRanges }),
+    });
+    if (!res.ok) {
+      $("networkStatus").textContent = `Impossible d'enregistrer : ${await res.text()}`;
+      return;
+    }
+    $("networkStatus").style.color = "var(--success)";
+    $("networkStatus").textContent = "Enregistré.";
+    setTimeout(() => { $("networkStatus").textContent = ""; $("networkStatus").style.color = ""; }, 2500);
+  });
 
   // --- Fil d'ariane ---
   function ancestorChain(perimeterId) {

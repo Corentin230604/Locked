@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from "../src/lib/httpTypes";
 import {
+  finalizeSessionExit,
   getSession,
   recordViolation,
-  updateSessionStatus,
   ViolationType,
 } from "../src/lib/roomService";
 
@@ -37,11 +37,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (type === "excluded") {
-    await updateSessionStatus(sessionId, "excluded");
+    // The agent only ever self-reports "excluded" for one reason: the focus
+    // countdown expired. A teacher-initiated exclusion goes through
+    // api/exclude.ts instead, which records "manual_exclusion" directly.
+    await finalizeSessionExit(sessionId, "excluded", "focus_timeout");
   } else if (type === "disconnected") {
-    await updateSessionStatus(sessionId, "disconnected");
+    await finalizeSessionExit(sessionId, "disconnected", "heartbeat_timeout");
   } else if (type === "test_exit") {
-    await updateSessionStatus(sessionId, "left");
+    await finalizeSessionExit(sessionId, "left", "test_exit");
   }
 
   const event = await recordViolation(sessionId, session.roomId, type, payload);

@@ -6,6 +6,9 @@ export interface School {
   emailDomains: string[];
   defaultValidityYears: number;
   defaultGracePeriodDays: number;
+  /** CIDR ranges (e.g. "203.0.113.0/24") a student's IP must fall within to
+   * join a room of this school. Empty = no restriction (default). */
+  allowedIpRanges: string[];
   createdAt: string;
 }
 
@@ -55,6 +58,7 @@ function toSchool(row: any): School {
     emailDomains: row.email_domains ?? [],
     defaultValidityYears: row.default_validity_years,
     defaultGracePeriodDays: row.default_grace_period_days,
+    allowedIpRanges: row.allowed_ip_ranges ?? [],
     createdAt: row.created_at,
   };
 }
@@ -138,6 +142,20 @@ export async function getSchoolById(id: string): Promise<School | null> {
   const { data, error } = await supabaseAdmin.from("schools").select().eq("id", id).maybeSingle();
   if (error) throw error;
   return data ? toSchool(data) : null;
+}
+
+/** Reserved for a full-school admin (adminPerimeterId null) or the platform
+ * admin — see api/school-network.ts. A scoped campus/department admin can't
+ * change a restriction that applies to the whole school. */
+export async function updateSchoolAllowedIpRanges(schoolId: string, allowedIpRanges: string[]): Promise<School> {
+  const { data, error } = await supabaseAdmin
+    .from("schools")
+    .update({ allowed_ip_ranges: allowedIpRanges })
+    .eq("id", schoolId)
+    .select()
+    .single();
+  if (error) throw error;
+  return toSchool(data);
 }
 
 /** Matches an email's domain against every school's allowed domains — used

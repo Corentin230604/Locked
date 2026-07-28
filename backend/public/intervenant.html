@@ -112,11 +112,19 @@
 
   .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-top: 1.25rem; }
   @media (max-width: 720px) { .dashboard-grid { grid-template-columns: 1fr; } }
-  .student, .submission, .room-row {
+  .submission, .room-row {
     display: flex; justify-content: space-between; align-items: center;
     padding: 0.65rem 0.9rem; border-radius: var(--radius-sm); margin-bottom: 0.5rem;
     background: #fbfbfd; border: 1px solid var(--border);
   }
+  .student {
+    padding: 0.65rem 0.9rem; border-radius: var(--radius-sm); margin-bottom: 0.5rem;
+    background: #fbfbfd; border: 1px solid var(--border);
+  }
+  .student .row-top { display: flex; justify-content: space-between; align-items: center; }
+  .student .row-meta { font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.3rem; }
+  .name { cursor: pointer; }
+  .name:hover { text-decoration: underline; }
   .room-row { flex-direction: column; align-items: stretch; cursor: pointer; }
   .room-row .summary { display: flex; justify-content: space-between; align-items: center; }
   .room-row .details { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border); font-size: 0.85rem; }
@@ -124,7 +132,19 @@
   .badge.active { color: var(--success); background: var(--success-bg); }
   .badge.excluded { color: var(--danger); background: var(--danger-bg); }
   .badge.disconnected, .badge.left { color: var(--text-secondary); background: rgba(0,0,0,0.05); }
+  .badge.disconnected { color: var(--warning); background: var(--warning-bg); }
   .empty-state { color: var(--text-secondary); font-size: 0.9rem; padding: 0.5rem 0; }
+
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 1rem; }
+  .modal { background: var(--card); border-radius: var(--radius-lg); box-shadow: var(--shadow); padding: 1.75rem; max-width: 560px; width: 100%; max-height: 82vh; overflow-y: auto; position: relative; }
+  .modal .close-btn { position: absolute; top: 1rem; right: 1.25rem; background: none; border: none; font-size: 1.3rem; cursor: pointer; color: var(--text-secondary); line-height: 1; }
+  .modal .field { margin-bottom: 0.5rem; font-size: 0.9rem; }
+  .modal .field strong { color: var(--text-secondary); font-weight: 500; margin-right: 0.4rem; }
+  .screenshot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 0.6rem; margin-top: 0.75rem; }
+  .screenshot-grid a { display: block; text-decoration: none; color: inherit; }
+  .screenshot-grid img { width: 100%; border-radius: 8px; border: 1px solid var(--border); display: block; }
+  .screenshot-grid .caption { font-size: 0.68rem; color: var(--text-secondary); margin-top: 0.2rem; }
+  .screenshot-grid a.flagged img { border-color: var(--warning); border-width: 2px; }
   #events { max-height: 50vh; overflow-y: auto; }
   .event { font-size: 0.85rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
   .event:last-child { border-bottom: none; }
@@ -265,6 +285,7 @@
           <div>
             <button class="action primary hidden" id="startExamBtn">Démarrer l'examen</button>
             <button class="action danger hidden" id="endExamBtn">Terminer l'examen</button>
+            <button class="action secondary" id="viewScreenshotsBtn">Captures IA</button>
             <button class="action secondary" id="backBtn">← Nouvelle room</button>
           </div>
         </div>
@@ -317,6 +338,15 @@
           automatiquement, à partager avec tes collègues pour qu'ils la rejoignent ici.
         </p>
       </div>
+    </div>
+  </div>
+
+  <div id="studentDetailBackdrop" class="modal-backdrop hidden">
+    <div class="modal">
+      <button class="close-btn" id="closeStudentDetail">&times;</button>
+      <h3 id="studentDetailName"></h3>
+      <div id="studentDetailFields"></div>
+      <div id="studentDetailScreenshots"></div>
     </div>
   </div>
 </div>
@@ -532,7 +562,46 @@
       status: s.status,
       joined_at: s.joined_at ?? s.joinedAt,
       last_seen: s.last_seen ?? s.lastSeen,
+      left_at: s.left_at ?? s.leftAt ?? null,
+      exit_reason: s.exit_reason ?? s.exitReason ?? null,
     };
+  }
+
+  // Same status can mean different things depending on why it happened —
+  // this is what lets the badge read "Exclu (manuel)" vs "Exclu (hors
+  // focus)" instead of just the raw "excluded" both share.
+  function exitLabel(s) {
+    if (s.status === "active") {
+      return s.exit_reason === "completed" ? { text: "Terminé", cls: "active" } : { text: "En cours", cls: "active" };
+    }
+    if (s.status === "excluded") {
+      return s.exit_reason === "manual_exclusion"
+        ? { text: "Exclu (manuel)", cls: "excluded" }
+        : { text: "Exclu (hors focus)", cls: "excluded" };
+    }
+    if (s.status === "disconnected") return { text: "Déconnecté", cls: "disconnected" };
+    if (s.status === "left") return { text: s.exit_reason === "test_exit" ? "Sortie test" : "Sorti", cls: "left" };
+    return { text: s.status, cls: s.status };
+  }
+
+  function formatDuration(startIso, endIso) {
+    const start = new Date(startIso).getTime();
+    const end = endIso ? new Date(endIso).getTime() : Date.now();
+    const totalSec = Math.max(0, Math.round((end - start) / 1000));
+    const min = Math.floor(totalSec / 60);
+    const sec = totalSec % 60;
+    return min > 0 ? `${min} min ${String(sec).padStart(2, "0")}s` : `${sec}s`;
+  }
+
+  // Purely informational for now (no gate blocks a post-launch join yet) —
+  // still lets the teacher see who came in before vs. after the start.
+  function entryModeLabelFor(s, room) {
+    const startRef = room?.startedAt || room?.scheduledStartAt;
+    if (!startRef) return "Salle d'attente";
+    return new Date(s.joined_at).getTime() < new Date(startRef).getTime() ? "Salle d'attente" : "Après lancement";
+  }
+  function entryModeLabel(s) {
+    return entryModeLabelFor(s, currentRoom);
   }
 
   function computeLifecycle(scheduledStartAt, startedAt, endedAt) {
@@ -569,14 +638,27 @@
     }
     el.innerHTML = "";
     for (const [sessionId, s] of students) {
+      const label = exitLabel(s);
+      const leftText = s.left_at ? new Date(s.left_at).toLocaleTimeString() : "—";
       const div = document.createElement("div");
       div.className = "student";
-      div.innerHTML = `<span>${s.student_name} <span class="badge ${s.status}">${s.status}</span></span>
-        <button class="action danger" data-id="${sessionId}">Exclure</button>`;
+      div.innerHTML = `
+        <div class="row-top">
+          <span class="name" data-open="${sessionId}">${s.student_name} <span class="badge ${label.cls}">${label.text}</span></span>
+          <button class="action danger" data-id="${sessionId}">Exclure</button>
+        </div>
+        <div class="row-meta">Entrée ${new Date(s.joined_at).toLocaleTimeString()} · Sortie ${leftText} · Durée ${formatDuration(s.joined_at, s.left_at)} · ${entryModeLabel(s)}</div>
+      `;
       el.appendChild(div);
     }
     el.querySelectorAll("button[data-id]").forEach((btn) => {
-      btn.addEventListener("click", () => authFetch("/api/exclude", { method: "POST", body: JSON.stringify({ sessionId: btn.dataset.id }) }));
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        authFetch("/api/exclude", { method: "POST", body: JSON.stringify({ sessionId: btn.dataset.id }) });
+      });
+    });
+    el.querySelectorAll("[data-open]").forEach((span) => {
+      span.addEventListener("click", () => openStudentDetail(span.dataset.open, currentRoom.id));
     });
   }
 
@@ -587,9 +669,99 @@
     div.className = "event";
     const studentName = students.get(v.session_id)?.student_name ?? "";
     const reason = v.type === "ai_flag" && v.payload?.reason ? ` — ${v.payload.reason}` : "";
-    div.innerHTML = `<span class="type type-${v.type}">${v.type}</span>${studentName} <span class="time">${new Date(v.created_at).toLocaleTimeString()}</span>${reason}`;
+    // Screenshot/AI-flag entries open straight to that student's captures —
+    // this is the "alerte" the agent's AI reviewer raises: motif + preuve
+    // visuelle, not just a bare log line.
+    const clickable = v.type === "ai_flag" || v.type === "screenshot";
+    const nameHtml = clickable ? `<span class="name" data-open="${v.session_id}">${studentName}</span>` : studentName;
+    div.innerHTML = `<span class="type type-${v.type}">${v.type}</span>${nameHtml} <span class="time">${new Date(v.created_at).toLocaleTimeString()}</span>${reason}`;
     el.prepend(div);
+    div.querySelector("[data-open]")?.addEventListener("click", () => openStudentDetail(v.session_id, currentRoom.id));
   }
+
+  // --- Détail élève (promo/école, copie rendue, répertoire des captures IA) ---
+  $("closeStudentDetail").addEventListener("click", () => $("studentDetailBackdrop").classList.add("hidden"));
+  $("studentDetailBackdrop").addEventListener("click", (e) => {
+    if (e.target.id === "studentDetailBackdrop") $("studentDetailBackdrop").classList.add("hidden");
+  });
+
+  function renderScreenshotGrid(el, screenshots) {
+    const withUrl = screenshots.filter((s) => s.url);
+    if (withUrl.length === 0) {
+      el.innerHTML = '<p class="empty-state">Aucune capture pour le moment.</p>';
+      return;
+    }
+    const items = withUrl
+      .map((s) => {
+        const name = s.studentName ? `${s.studentName} — ` : "";
+        const flag = s.type === "ai_flag" ? ` ⚠️ ${s.reason ?? "signalé"}` : "";
+        return `
+          <a href="${s.url}" target="_blank" rel="noopener" class="${s.type === "ai_flag" ? "flagged" : ""}">
+            <img src="${s.url}" loading="lazy" />
+            <div class="caption">${name}${new Date(s.createdAt).toLocaleTimeString()}${flag}</div>
+          </a>`;
+      })
+      .join("");
+    el.innerHTML = `<div class="screenshot-grid">${items}</div>`;
+  }
+
+  async function openStudentDetail(sessionId, roomId) {
+    const s = students.get(sessionId);
+    $("studentDetailName").textContent = s?.student_name ?? "Élève";
+    $("studentDetailFields").innerHTML = '<p class="empty-state">Chargement...</p>';
+    $("studentDetailScreenshots").innerHTML = "";
+    $("studentDetailBackdrop").classList.remove("hidden");
+
+    const res = await authFetch(`/api/session-detail?sessionId=${encodeURIComponent(sessionId)}`);
+    if (!res.ok) {
+      $("studentDetailFields").innerHTML = '<p class="empty-state">Impossible de charger le détail.</p>';
+      return;
+    }
+    const detail = await res.json();
+    // detail.session comes straight from roomService's camelCase Session —
+    // normalize so exitLabel/etc. see the same snake_case shape they get
+    // from Realtime/normalizeSession everywhere else.
+    const normalized = normalizeSession(detail.session);
+    const label = exitLabel(s ?? normalized);
+
+    $("studentDetailFields").innerHTML = `
+      ${detail.schoolName ? `<div class="field"><strong>École</strong>${detail.schoolName}</div>` : ""}
+      ${detail.className ? `<div class="field"><strong>Promo/Classe</strong>${detail.className}</div>` : ""}
+      <div class="field"><strong>Statut</strong>${label.text}</div>
+      <div class="field"><strong>Entrée</strong>${new Date(normalized.joined_at).toLocaleString()}</div>
+      <div class="field"><strong>Sortie</strong>${normalized.left_at ? new Date(normalized.left_at).toLocaleString() : "—"}</div>
+      <div class="field"><strong>Copie rendue</strong>${detail.submissionUrl ? `<a href="${detail.submissionUrl}" target="_blank" rel="noopener">Télécharger</a>` : "en attente..."}</div>
+    `;
+
+    if (detail.screenshotCount > 0) {
+      const shotsRes = await authFetch(
+        `/api/room-screenshots?roomId=${encodeURIComponent(roomId)}&sessionId=${encodeURIComponent(sessionId)}`
+      );
+      if (shotsRes.ok) {
+        const { screenshots } = await shotsRes.json();
+        renderScreenshotGrid($("studentDetailScreenshots"), screenshots);
+      }
+    } else {
+      $("studentDetailScreenshots").innerHTML = '<p class="empty-state">Aucune capture pour le moment.</p>';
+    }
+  }
+
+  $("viewScreenshotsBtn").addEventListener("click", async () => {
+    if (!currentRoom) return;
+    $("studentDetailName").textContent = "Captures IA — toute la room";
+    $("studentDetailFields").innerHTML = "";
+    $("studentDetailScreenshots").innerHTML = '<p class="empty-state">Chargement...</p>';
+    $("studentDetailBackdrop").classList.remove("hidden");
+
+    const res = await authFetch(`/api/room-screenshots?roomId=${encodeURIComponent(currentRoom.id)}`);
+    if (!res.ok) {
+      $("studentDetailScreenshots").innerHTML = '<p class="empty-state">Impossible de charger les captures.</p>';
+      return;
+    }
+    const { screenshots } = await res.json();
+    const withNames = screenshots.map((s) => ({ ...s, studentName: students.get(s.sessionId)?.student_name ?? "" }));
+    renderScreenshotGrid($("studentDetailScreenshots"), withNames);
+  });
 
   function renderRoomState() {
     if (!currentRoom) return;
@@ -728,11 +900,27 @@
       authFetch(`/api/sessions?code=${encodeURIComponent(room.code)}`),
       authFetch(`/api/room-violations?roomId=${encodeURIComponent(room.id)}`),
     ]);
-    const sessions = sessionsRes.ok ? (await sessionsRes.json()).sessions : [];
+    const rawSessions = sessionsRes.ok ? (await sessionsRes.json()).sessions : [];
     const violations = violationsRes.ok ? (await violationsRes.json()).violations : [];
+    const sessions = rawSessions.map(normalizeSession);
+    // So a click on a name here (a finished room, not the live dashboard's
+    // `students` map) still resolves a name via openStudentDetail's lookup.
+    for (const s of sessions) students.set(s.id, s);
 
     const studentsHtml = sessions.length
-      ? sessions.map((s) => `<div>${s.studentName ?? s.student_name} — ${s.status}</div>`).join("")
+      ? sessions
+          .map((s) => {
+            const label = exitLabel(s);
+            const leftText = s.left_at ? new Date(s.left_at).toLocaleTimeString() : "—";
+            return `<div style="margin-bottom: 0.35rem;">
+              <span class="name" data-open-hist="${s.id}">${s.student_name}</span>
+              <span class="badge ${label.cls}">${label.text}</span>
+              <span style="color: var(--text-secondary); font-size: 0.78rem;">
+                — Entrée ${new Date(s.joined_at).toLocaleTimeString()} · Sortie ${leftText} · Durée ${formatDuration(s.joined_at, s.left_at)} · ${entryModeLabelFor(s, room)}
+              </span>
+            </div>`;
+          })
+          .join("")
       : '<div class="empty-state">Aucun élève.</div>';
     const eventsHtml = violations.length
       ? violations.map((v) => `<div><span class="type type-${v.type}">${v.type}</span> ${new Date(v.createdAt).toLocaleString()}</div>`).join("")
@@ -742,7 +930,23 @@
       <strong>Code :</strong> ${room.code}${room.coOrganizerCode ? ` · <strong>Co-organisateur :</strong> ${room.coOrganizerCode}` : ""}<br/>
       <div style="margin-top: 0.6rem;"><strong>Étudiants</strong>${studentsHtml}</div>
       <div style="margin-top: 0.6rem;"><strong>Événements</strong>${eventsHtml}</div>
+      <div style="margin-top: 0.6rem;"><button class="action secondary small" data-view-shots="${room.id}">Voir les captures IA</button></div>
     `;
+    details.querySelectorAll("[data-open-hist]").forEach((el) => {
+      el.addEventListener("click", (e) => { e.stopPropagation(); openStudentDetail(el.dataset.openHist, room.id); });
+    });
+    details.querySelector("[data-view-shots]").addEventListener("click", async (e) => {
+      e.stopPropagation();
+      $("studentDetailName").textContent = `Captures IA — ${room.config.examTitle}`;
+      $("studentDetailFields").innerHTML = "";
+      $("studentDetailScreenshots").innerHTML = '<p class="empty-state">Chargement...</p>';
+      $("studentDetailBackdrop").classList.remove("hidden");
+      const shotsRes = await authFetch(`/api/room-screenshots?roomId=${encodeURIComponent(room.id)}`);
+      if (!shotsRes.ok) { $("studentDetailScreenshots").innerHTML = '<p class="empty-state">Impossible de charger les captures.</p>'; return; }
+      const { screenshots } = await shotsRes.json();
+      const withNames = screenshots.map((sh) => ({ ...sh, studentName: students.get(sh.sessionId)?.student_name ?? "" }));
+      renderScreenshotGrid($("studentDetailScreenshots"), withNames);
+    });
   }
 
   // --- Co-créer ---

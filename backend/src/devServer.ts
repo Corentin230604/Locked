@@ -31,7 +31,11 @@ import roomViolationsHandler from "../api/room-violations";
 import schoolAdminsHandler from "../api/school-admins";
 import updateMembershipHandler from "../api/update-membership";
 import revokeMembershipHandler from "../api/revoke-membership";
+import schoolNetworkHandler from "../api/school-network";
+import roomScreenshotsHandler from "../api/room-screenshots";
+import sessionDetailHandler from "../api/session-detail";
 import { runLifecycleSweep } from "./lib/lifecycleService";
+import { runSessionTimeoutSweep } from "./lib/roomService";
 
 /**
  * Express entrypoint mounting the same handler functions Vercel's serverless
@@ -90,6 +94,9 @@ mount("/api/room-violations", roomViolationsHandler);
 mount("/api/school-admins", schoolAdminsHandler);
 mount("/api/update-membership", updateMembershipHandler);
 mount("/api/revoke-membership", revokeMembershipHandler);
+mount("/api/school-network", schoolNetworkHandler);
+mount("/api/room-screenshots", roomScreenshotsHandler);
+mount("/api/session-detail", sessionDetailHandler);
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 function scheduleLifecycleSweep() {
@@ -103,6 +110,17 @@ function scheduleLifecycleSweep() {
 }
 scheduleLifecycleSweep();
 setInterval(scheduleLifecycleSweep, ONE_DAY_MS);
+
+const SESSION_SWEEP_INTERVAL_MS = 20_000;
+function scheduleSessionTimeoutSweep() {
+  runSessionTimeoutSweep()
+    .then(({ disconnected }) => {
+      if (disconnected) console.log(`Session sweep: ${disconnected} disconnected (heartbeat timeout).`);
+    })
+    .catch((err) => console.error("Session timeout sweep failed:", err));
+}
+scheduleSessionTimeoutSweep();
+setInterval(scheduleSessionTimeoutSweep, SESSION_SWEEP_INTERVAL_MS);
 
 app.listen(PORT, () => {
   console.log(`Locked dev server listening on http://localhost:${PORT}`);

@@ -47,6 +47,16 @@ export interface Room {
 
 export type SessionStatus = "active" | "excluded" | "disconnected" | "left";
 
+/** Set together with `leftAt` the moment a session reaches a terminal state
+ * — "completed" is the only non-anomalous one (room ended while the student
+ * was still present); every other value pairs with a specific `status`. */
+export type ExitReason =
+  | "completed"
+  | "manual_exclusion"
+  | "focus_timeout"
+  | "heartbeat_timeout"
+  | "test_exit";
+
 export interface Session {
   id: string;
   roomId: string;
@@ -54,6 +64,12 @@ export interface Session {
   status: SessionStatus;
   joinedAt: string;
   lastSeen: string;
+  /** Null while the student is still in the room. */
+  leftAt: string | null;
+  exitReason: ExitReason | null;
+  /** Client IP at join time (see lib/network.ts) — informational once a
+   * room has no network restriction configured, enforced otherwise. */
+  joinIp: string | null;
   submissionPath: string | null;
   membershipId: string | null;
 }
@@ -123,6 +139,9 @@ function toSession(row: any): Session {
     status: row.status,
     joinedAt: row.joined_at,
     lastSeen: row.last_seen,
+    leftAt: row.left_at,
+    exitReason: row.exit_reason,
+    joinIp: row.join_ip,
     submissionPath: row.submission_path,
     membershipId: row.membership_id,
   };
@@ -197,14 +216,20 @@ export async function getRoomById(roomId: string): Promise<Room | null> {
 export async function joinRoom(
   code: string,
   studentName: string,
-  membershipId?: string
+  membershipId?: string,
+  joinIp?: string | null
 ): Promise<{ room: Room; session: Session } | null> {
   const room = await getRoomByCode(code);
   if (!room || room.status !== "open") return null;
 
   const { data, error } = await supabaseAdmin
     .from("sessions")
-    .insert({ room_id: room.id, student_name: studentName, membership_id: membershipId ?? null })
+    .insert({
+      room_id: room.id,
+      student_name: studentName,
+      membership_id: membershipId ?? null,
+      join_ip: joinIp ?? null,
+    })
     .select()
     .single();
   if (error) throw error;
@@ -357,13 +382,19 @@ export async function getSessionsForRoom(roomId: string): Promise<Session[]> {
   return (data ?? []).map(toSession);
 }
 
-export async function updateSessionStatus(
+/** Every path that ends a student's participation (exclusion, disconnection,
+ * test exit, room ending normally) goes through here so `leftAt`/`exitReason`
+ * are always set together — this is what lets the history view render a
+ * definitive, color-coded reason for every departure instead of just the
+ * raw `status`. */
+export async function finalizeSessionExit(
   sessionId: string,
-  status: SessionStatus
+  status: SessionStatus,
+  exitReason: ExitReason
 ): Promise<void> {
   const { error } = await supabaseAdmin
     .from("sessions")
-    .update({ status })
+    .update({ status, exit_reason: exitReason, left_at: new Date().toISOString() })
     .eq("id", sessionId);
   if (error) throw error;
 }
@@ -395,7 +426,7 @@ export async function recordViolation(
 export async function excludeSession(sessionId: string): Promise<Session | null> {
   const session = await getSession(sessionId);
   if (!session) return null;
-  await updateSessionStatus(sessionId, "excluded");
+  await finalizeSessionExit(sessionId, "excluded", "manual_exclusion");
   await recordViolation(sessionId, session.roomId, "excluded", {
     reason: "manual_teacher_action",
   });
@@ -425,6 +456,19 @@ export async function endRoom(roomId: string): Promise<Room | null> {
     .select()
     .single();
   if (error) throw error;
+
+  // Anyone still "active" made it to the end without incident — record that
+  // explicitly (status stays "active", only leftAt/exitReason are set) so
+  // the history view can tell "finished normally" apart from "still in
+  // progress" without having to look at the room's own lifecycle too.
+  const { error: closeError } = await supabaseAdmin
+    .from("sessions")
+    .update({ exit_reason: "completed", left_at: new Date().toISOString() })
+    .eq("room_id", roomId)
+    .eq("status", "active")
+    .is("left_at", null);
+  if (closeError) throw closeError;
+
   return data ? toRoom(data) : null;
 }
 
@@ -434,6 +478,36 @@ export async function setExamFile(roomId: string, path: string): Promise<void> {
     .update({ exam_file_path: path })
     .eq("id", roomId);
   if (error) throw error;
+}
+
+// Agents heartbeat every 15s (see BackendClient.cs/.swift) — 4 missed beats
+// is a reliable "this agent is gone" signal without flagging a single
+// dropped request as an exit. This closes a real gap: without it, a student
+// who kills the agent process (rather than letting focus-loss/exclusion
+// catch them) would stay "active" forever, with no exit reason ever
+// recorded — an exploitable way to vanish from the room with no trace.
+const HEARTBEAT_TIMEOUT_MS = 60_000;
+
+/** Marks sessions whose agent has gone silent as "disconnected". Only
+ * touches sessions that are still `active` and haven't already been closed
+ * out (`leftAt` null) — a session a room's `endRoom()` already finalized as
+ * "completed" keeps that reason even though its heartbeat naturally goes
+ * stale right after (the agent quits once the exam ends). */
+export async function runSessionTimeoutSweep(): Promise<{ disconnected: number }> {
+  const cutoff = new Date(Date.now() - HEARTBEAT_TIMEOUT_MS).toISOString();
+  const { data, error } = await supabaseAdmin
+    .from("sessions")
+    .select("id, room_id")
+    .eq("status", "active")
+    .is("left_at", null)
+    .lt("last_seen", cutoff);
+  if (error) throw error;
+
+  for (const row of data ?? []) {
+    await finalizeSessionExit(row.id, "disconnected", "heartbeat_timeout");
+    await recordViolation(row.id, row.room_id, "disconnected", { reason: "heartbeat_timeout" });
+  }
+  return { disconnected: (data ?? []).length };
 }
 
 export async function setSubmissionPath(sessionId: string, path: string): Promise<void> {
