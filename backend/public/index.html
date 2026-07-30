@@ -3,81 +3,619 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Locked</title>
+<title>Locked — Examens Excel en conditions surveillées</title>
+<meta name="description" content="Locked verrouille n'importe quel poste Windows ou Mac en salle d'examen surveillée : plein écran, détection d'écran secondaire, analyse IA des captures, copies rendues automatiquement." />
+<link rel="preconnect" href="https://fonts.bunny.net">
+<link href="https://fonts.bunny.net/css?family=fraunces:400,500,600,500i,700|work-sans:400,500,600,700|ibm-plex-mono:500,600&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #f5f5f7;
-    --card: #ffffff;
-    --text: #1d1d1f;
-    --text-secondary: #6e6e73;
-    --border: rgba(0, 0, 0, 0.07);
-    --shadow: 0 2px 10px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.03);
-    --accent: #0071e3;
-    --accent-hover: #0077ed;
-    --radius-lg: 20px;
+    --paper: #f6f1e7;
+    --paper-line: rgba(23, 20, 38, 0.07);
+    --ink: #17142a;
+    --ink-soft: #55507a;
+    --indigo: #4433c7;
+    --indigo-deep: #241c6b;
+    --indigo-on-paper: #3a2fae;
+    --focus: #e0982f;
+    --focus-ink: #6b430e;
+    --rule: #d8cfb8;
+    --card: #fffdf8;
+    --shadow-sm: 0 1px 2px rgba(23, 20, 38, 0.07);
+    --shadow-lg: 0 16px 40px rgba(23, 20, 38, 0.10);
+    --state-waiting: #b8791f;
+    --state-active: #2f6b45;
+    --radius: 3px;
+    --content-max: 1080px;
+    --measure: 640px;
+    --rule-indent: 1.75rem;
   }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    -webkit-font-smoothing: antialiased;
-  }
-  .app { max-width: 760px; width: 100%; padding: 2.5rem 1.5rem; text-align: center; }
-  h1 { font-size: 2.75rem; font-weight: 600; letter-spacing: -0.02em; margin: 0 0 0.4rem; }
-  .subtitle { color: var(--text-secondary); font-size: 1.1rem; margin: 0 0 2.5rem; }
-  .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
-  @media (max-width: 620px) { .choices { grid-template-columns: 1fr; } }
-  a.choice {
-    display: block;
-    background: var(--card);
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow);
-    padding: 2.25rem 1.5rem;
-    text-decoration: none;
-    color: var(--text);
-    transition: transform 0.12s ease, box-shadow 0.12s ease;
-  }
-  a.choice:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08); }
-  a.choice .icon { font-size: 2.25rem; margin-bottom: 0.75rem; }
-  a.choice .label { font-size: 1.2rem; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 0.35rem; }
-  a.choice .desc { font-size: 0.9rem; color: var(--text-secondary); }
-  a.choice.accent .label { color: var(--accent); }
 
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #000000;
-      --card: #1c1c1e;
-      --text: #f5f5f7;
-      --text-secondary: #9a9a9e;
-      --border: rgba(255, 255, 255, 0.09);
-      --shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+      --paper: #121022;
+      --paper-line: rgba(255, 255, 255, 0.055);
+      --ink: #f1ecdf;
+      --ink-soft: #b6afd8;
+      --indigo: #9384f5;
+      --indigo-deep: #0d0b1c;
+      --indigo-on-paper: #a698f7;
+      --focus: #eeb15c;
+      --focus-ink: #3a2503;
+      --rule: rgba(255, 255, 255, 0.16);
+      --card: #1a1730;
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+      --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.45);
+      --state-waiting: #e0a748;
+      --state-active: #5fb37e;
     }
   }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Work Sans", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+  }
+
+  a { color: inherit; }
+  a:focus-visible, button:focus-visible {
+    outline: 2px solid var(--indigo-on-paper);
+    outline-offset: 3px;
+  }
+
+  h1, h2, h3 {
+    font-family: "Fraunces", Georgia, serif;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  .wrap { max-width: var(--content-max); margin: 0 auto; padding: 0 1.75rem; }
+
+  .ruled {
+    border-left: 1.5px solid var(--rule);
+    padding-left: var(--rule-indent);
+  }
+  @media (max-width: 640px) {
+    .ruled { border-left-width: 1px; padding-left: 1.1rem; }
+  }
+
+  /* ---------- Nav ---------- */
+  .nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.5rem 1.75rem;
+    max-width: var(--content-max);
+    margin: 0 auto;
+  }
+  .wordmark {
+    font-family: "Fraunces", Georgia, serif;
+    font-weight: 600;
+    font-size: 1.35rem;
+    letter-spacing: -0.01em;
+    text-decoration: none;
+    color: var(--ink);
+  }
+  .wordmark .dot { color: var(--focus); }
+  .nav-links { display: flex; gap: 1.75rem; font-size: 0.92rem; font-weight: 500; }
+  .nav-links a { text-decoration: none; color: var(--ink-soft); }
+  .nav-links a:hover { color: var(--ink); }
+  @media (max-width: 560px) { .nav-links { display: none; } }
+
+  /* ---------- Hero ---------- */
+  .hero {
+    max-width: var(--content-max);
+    margin: 0 auto;
+    padding: 2.5rem 1.75rem 5rem;
+    display: grid;
+    grid-template-columns: 1.05fr 0.95fr;
+    gap: 3.5rem;
+    align-items: center;
+  }
+  @media (max-width: 900px) {
+    .hero { grid-template-columns: 1fr; padding-bottom: 3.5rem; }
+  }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.72rem;
+    font-weight: 500;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--indigo-on-paper);
+    margin: 0 0 1rem;
+  }
+
+  h1.headline {
+    font-size: clamp(2.35rem, 5vw, 3.6rem);
+    line-height: 1.06;
+    margin-bottom: 1.35rem;
+  }
+  h1.headline em {
+    font-style: italic;
+    font-weight: 500;
+    color: var(--indigo-on-paper);
+  }
+
+  .lede {
+    max-width: 46ch;
+    color: var(--ink-soft);
+    font-size: 1.08rem;
+    line-height: 1.6;
+    margin: 0 0 2.1rem;
+  }
+
+  .cta-row { display: flex; flex-wrap: wrap; gap: 0.9rem; }
+  .cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: "Work Sans", sans-serif;
+    font-weight: 600;
+    font-size: 0.96rem;
+    text-decoration: none;
+    padding: 0.85rem 1.5rem;
+    border-radius: var(--radius);
+    border: 1.5px solid transparent;
+    transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+  }
+  .cta:active { transform: translateY(1px); }
+  .cta-primary { background: var(--ink); color: var(--paper); }
+  .cta-primary:hover { background: var(--indigo-deep); }
+  @media (prefers-color-scheme: dark) {
+    .cta-primary { color: var(--ink-soft) ; background: var(--focus); color: #241503; }
+    .cta-primary:hover { background: #f3c07a; }
+  }
+  .cta-ghost { border-color: var(--ink); color: var(--ink); }
+  .cta-ghost:hover { border-color: var(--indigo-on-paper); color: var(--indigo-on-paper); }
+
+  /* ---------- Lock demo card ---------- */
+  .lock-demo { display: flex; justify-content: center; }
+  .lock-card {
+    width: 100%;
+    max-width: 340px;
+    background: var(--card);
+    border: 1.5px solid var(--rule);
+    border-radius: 10px;
+    box-shadow: var(--shadow-lg);
+    padding: 1.5rem 1.4rem 1.7rem;
+    transition: border-color 0.5s ease, box-shadow 0.5s ease, background 0.5s ease;
+  }
+  .lock-card .lc-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.1rem;
+  }
+  .lc-code {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-weight: 600;
+    font-size: 1.15rem;
+    letter-spacing: 0.06em;
+  }
+  .lc-pill {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 0.28rem 0.6rem;
+    border-radius: 999px;
+    color: var(--state-waiting);
+    background: color-mix(in srgb, var(--state-waiting) 16%, transparent);
+    transition: color 0.5s ease, background 0.5s ease;
+  }
+  .lc-row { font-size: 0.85rem; color: var(--ink-soft); margin-bottom: 0.5rem; }
+  .lc-row .lc-num {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .lc-divider { height: 1px; background: var(--paper-line); margin: 1rem 0; }
+  .lc-foot { display: flex; align-items: center; gap: 0.5rem; font-size: 0.78rem; color: var(--ink-soft); }
+  .lc-foot svg { flex: none; opacity: 0.75; transition: opacity 0.5s ease; }
+  .lock-card.is-locked {
+    border-color: var(--indigo);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--indigo) 14%, transparent), var(--shadow-lg);
+  }
+  .lock-card.is-locked .lc-pill {
+    color: var(--indigo-on-paper);
+    background: color-mix(in srgb, var(--indigo) 16%, transparent);
+  }
+  .lock-card.is-locked .lc-foot svg { opacity: 1; }
+  @media (prefers-reduced-motion: no-preference) {
+    .lock-card.is-locked { animation: lc-settle 0.4s ease; }
+  }
+  @keyframes lc-settle {
+    0% { transform: scale(1); }
+    35% { transform: scale(0.975); }
+    100% { transform: scale(1); }
+  }
+
+  /* ---------- Section shells ---------- */
+  section.block { max-width: var(--content-max); margin: 0 auto; padding: 4.5rem 1.75rem; }
+  section.block.tinted { background: var(--card); border-top: 1px solid var(--paper-line); border-bottom: 1px solid var(--paper-line); }
+  .block-inner { max-width: var(--content-max); margin: 0 auto; }
+  .section-head { max-width: var(--measure); margin-bottom: 2.75rem; }
+  .section-head h2 { font-size: clamp(1.6rem, 3vw, 2.1rem); margin-bottom: 0.7rem; }
+  .section-head p { color: var(--ink-soft); font-size: 1.02rem; max-width: 52ch; margin: 0; }
+
+  /* ---------- How it works ---------- */
+  .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 1.9rem; }
+  .step {
+    display: grid;
+    grid-template-columns: 2.75rem 1fr;
+    gap: 1.25rem;
+    padding-left: var(--rule-indent);
+    border-left: 1.5px solid var(--rule);
+    position: relative;
+  }
+  .step::before {
+    content: "";
+    position: absolute;
+    left: -4.5px;
+    top: 0.35rem;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--focus);
+  }
+  .step .num {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--indigo-on-paper);
+  }
+  .step h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.35rem; font-family: "Work Sans", sans-serif; }
+  .step p { margin: 0; color: var(--ink-soft); font-size: 0.96rem; max-width: 56ch; }
+
+  /* ---------- Règlement ---------- */
+  .reglement-frame {
+    border: 1.5px solid var(--rule);
+    border-radius: 4px;
+    background: var(--card);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+  }
+  .reglement-head {
+    text-align: center;
+    padding: 1.9rem 1.5rem 1.6rem;
+    border-bottom: 1.5px solid var(--rule);
+    background:
+      repeating-linear-gradient(
+        var(--paper-line), var(--paper-line) 1px,
+        transparent 1px, transparent 1.65rem
+      );
+  }
+  .reglement-head .kicker {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    display: block;
+    margin-bottom: 0.6rem;
+  }
+  .reglement-head h2 { font-size: clamp(1.4rem, 2.6vw, 1.85rem); }
+  .articles { display: grid; }
+  .article {
+    display: grid;
+    grid-template-columns: 5.5rem 1fr;
+    gap: 1.5rem;
+    padding: 1.85rem 2rem;
+    border-bottom: 1px solid var(--paper-line);
+  }
+  .article:last-child { border-bottom: none; }
+  @media (max-width: 640px) {
+    .article { grid-template-columns: 1fr; gap: 0.5rem; padding: 1.5rem 1.25rem; }
+  }
+  .article .art-no {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--focus-ink);
+    background: color-mix(in srgb, var(--focus) 22%, transparent);
+    height: fit-content;
+    padding: 0.3rem 0.55rem;
+    border-radius: 3px;
+  }
+  .article h3 { font-size: 1.05rem; font-weight: 600; font-family: "Work Sans", sans-serif; margin-bottom: 0.4rem; }
+  .article p { margin: 0; color: var(--ink-soft); font-size: 0.95rem; max-width: 60ch; }
+
+  /* ---------- Platforms ---------- */
+  .platforms {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+    align-items: stretch;
+  }
+  .platform-card {
+    flex: 1 1 220px;
+    border: 1.5px solid var(--rule);
+    border-radius: 4px;
+    padding: 1.5rem 1.6rem;
+    background: var(--card);
+  }
+  .platform-card .p-os {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--indigo-on-paper);
+    display: block;
+    margin-bottom: 0.5rem;
+  }
+  .platform-card p:last-child { margin: 0.45rem 0 0; color: var(--ink-soft); font-size: 0.92rem; }
+
+  /* ---------- Final CTA ---------- */
+  .final-cta { text-align: center; }
+  .final-cta .section-head { margin: 0 auto 2.5rem; text-align: center; }
+  .entry-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; text-align: left; }
+  @media (max-width: 640px) { .entry-grid { grid-template-columns: 1fr; } }
+  a.entry {
+    display: block;
+    background: var(--card);
+    border: 1.5px solid var(--rule);
+    border-radius: 6px;
+    padding: 1.85rem 1.75rem;
+    text-decoration: none;
+    color: var(--ink);
+    box-shadow: var(--shadow-sm);
+    transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  a.entry:hover { transform: translateY(-2px); border-color: var(--indigo); box-shadow: var(--shadow-lg); }
+  a.entry .e-kicker {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+  a.entry .e-label {
+    font-family: "Fraunces", Georgia, serif;
+    font-size: 1.35rem;
+    font-weight: 600;
+    margin: 0.4rem 0 0.5rem;
+  }
+  a.entry.accent .e-label { color: var(--indigo-on-paper); }
+  a.entry .e-desc { font-size: 0.9rem; color: var(--ink-soft); }
+
+  /* ---------- Footer ---------- */
+  footer {
+    max-width: var(--content-max);
+    margin: 0 auto;
+    padding: 2.5rem 1.75rem 3.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+    border-top: 1px solid var(--paper-line);
+    color: var(--ink-soft);
+    font-size: 0.85rem;
+  }
+  footer .wordmark { font-size: 1rem; }
 </style>
 </head>
 <body>
-<div class="app">
-  <h1>Locked</h1>
-  <p class="subtitle">Examens Excel en conditions surveillées</p>
-  <div class="choices">
-    <a class="choice accent" href="intervenant.html">
-      <div class="icon">🧑‍🏫</div>
-      <div class="label">Espace professionnel</div>
-      <div class="desc">Intervenants, admins d'établissement et super-admin</div>
+
+<nav class="nav">
+  <a class="wordmark" href="index.html">Locked<span class="dot">.</span></a>
+  <div class="nav-links">
+    <a href="#reglement">Fonctionnement</a>
+    <a href="intervenant.html">Espace professionnel</a>
+    <a href="student.html">Espace élève</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <div>
+    <p class="eyebrow">Examens Excel · surveillance automatisée</p>
+    <h1 class="headline">Un clic. Toute la salle <em>se verrouille.</em></h1>
+    <p class="lede">
+      Locked transforme n'importe quel poste Windows ou Mac en salle d'examen
+      surveillée — sans matériel additionnel, sans surveillant dans la salle,
+      en quelques secondes.
+    </p>
+    <div class="cta-row">
+      <a class="cta cta-primary" href="intervenant.html">Espace professionnel</a>
+      <a class="cta cta-ghost" href="student.html">Espace élève</a>
+    </div>
+  </div>
+
+  <div class="lock-demo">
+    <div class="lock-card" id="lockCard">
+      <div class="lc-top">
+        <span class="lc-code">AB12CD</span>
+        <span class="lc-pill" id="lcPill">En attente</span>
+      </div>
+      <div class="lc-row" id="lcMeta">Démarrage dans <span class="lc-num" id="lcTimer">00:03</span></div>
+      <div class="lc-divider"></div>
+      <div class="lc-foot">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <rect x="5" y="11" width="14" height="9" rx="1.5" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M8 11V7a4 4 0 0 1 8 0v4" stroke="currentColor" stroke-width="1.6"/>
+        </svg>
+        <span id="lcFootText">17 postes connectés</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section class="block" id="fonctionnement">
+  <div class="section-head">
+    <h2>Comment ça marche</h2>
+    <p>Quatre étapes, du côté intervenant comme du côté élève.</p>
+  </div>
+  <ol class="steps">
+    <li class="step">
+      <span class="num">01</span>
+      <div>
+        <h3>Créer une room</h3>
+        <p>L'intervenant crée une room en quelques champs et communique le code aux étudiants concernés.</p>
+      </div>
+    </li>
+    <li class="step">
+      <span class="num">02</span>
+      <div>
+        <h3>Rejoindre avec le code</h3>
+        <p>Les étudiants rejoignent la salle d'attente. Une connexion après le lancement passe par une validation manuelle de l'intervenant.</p>
+      </div>
+    </li>
+    <li class="step">
+      <span class="num">03</span>
+      <div>
+        <h3>Démarrer l'examen</h3>
+        <p>Au clic sur « Démarrer », chaque poste connecté passe en plein écran verrouillé au même instant.</p>
+      </div>
+    </li>
+    <li class="step">
+      <span class="num">04</span>
+      <div>
+        <h3>Copies rendues automatiquement</h3>
+        <p>À la fin de l'épreuve, chaque classeur Excel est enregistré et transmis sans intervention manuelle.</p>
+      </div>
+    </li>
+  </ol>
+</section>
+
+<section class="block tinted" id="reglement">
+  <div class="block-inner">
+    <div class="reglement-frame">
+      <div class="reglement-head">
+        <span class="kicker">Ce que Locked fait respecter</span>
+        <h2>Règlement de la salle d'examen</h2>
+      </div>
+      <div class="articles">
+        <div class="article">
+          <span class="art-no">Art. 1</span>
+          <div>
+            <h3>Accès contrôlé</h3>
+            <p>Code propre à la classe, réseau de l'établissement vérifié : toute connexion après le lancement de l'examen passe par une validation manuelle de l'intervenant.</p>
+          </div>
+        </div>
+        <div class="article">
+          <span class="art-no">Art. 2</span>
+          <div>
+            <h3>Plein écran intégral</h3>
+            <p>Le poste passe en plein écran verrouillé pour toute la durée de l'épreuve ; les raccourcis permettant d'en sortir sont bloqués.</p>
+          </div>
+        </div>
+        <div class="article">
+          <span class="art-no">Art. 3</span>
+          <div>
+            <h3>Un seul écran autorisé</h3>
+            <p>Le branchement d'un second moniteur déclenche un avertissement immédiat, avec un délai pour le débrancher avant exclusion.</p>
+          </div>
+        </div>
+        <div class="article">
+          <span class="art-no">Art. 4</span>
+          <div>
+            <h3>Aucune application tierce</h3>
+            <p>Bureau à distance, assistants IA : toute application non autorisée détectée en cours d'épreuve déclenche le même avertissement.</p>
+          </div>
+        </div>
+        <div class="article">
+          <span class="art-no">Art. 5</span>
+          <div>
+            <h3>Sous contrôle visuel</h3>
+            <p>Des captures d'écran horodatées sont analysées automatiquement et restent consultables par l'intervenant, élève par élève.</p>
+          </div>
+        </div>
+        <div class="article">
+          <span class="art-no">Art. 6</span>
+          <div>
+            <h3>Remise automatique</h3>
+            <p>Dès la fin de l'épreuve, chaque copie Excel est enregistrée et envoyée sans manipulation de l'étudiant.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="plateformes">
+  <div class="section-head">
+    <h2>Un agent, deux systèmes</h2>
+    <p>Même verrouillage, mêmes captures, même tableau de bord — quel que soit le poste de la salle.</p>
+  </div>
+  <div class="platforms">
+    <div class="platform-card">
+      <span class="p-os">Windows</span>
+      <p>Agent natif, installation en un clic depuis l'espace élève.</p>
+    </div>
+    <div class="platform-card">
+      <span class="p-os">macOS</span>
+      <p>Agent natif équivalent, mêmes garanties de surveillance.</p>
+    </div>
+  </div>
+</section>
+
+<section class="block final-cta">
+  <div class="section-head">
+    <h2>Choisissez votre entrée</h2>
+    <p>Un seul point d'accès pour toute la hiérarchie de l'établissement.</p>
+  </div>
+  <div class="entry-grid">
+    <a class="entry accent" href="intervenant.html">
+      <span class="e-kicker">Personnel</span>
+      <div class="e-label">Espace professionnel</div>
+      <div class="e-desc">Intervenants, admins d'établissement et super-admin.</div>
     </a>
-    <a class="choice" href="student.html">
-      <div class="icon">🎓</div>
-      <div class="label">Élève</div>
-      <div class="desc">Rejoindre un examen avec un code</div>
+    <a class="entry" href="student.html">
+      <span class="e-kicker">Étudiants</span>
+      <div class="e-label">Espace élève</div>
+      <div class="e-desc">Rejoindre un examen avec le code communiqué en salle.</div>
     </a>
   </div>
-</div>
+</section>
+
+<footer>
+  <a class="wordmark" href="index.html">Locked<span class="dot">.</span></a>
+  <span>Examens Excel en conditions surveillées.</span>
+</footer>
+
+<script>
+  (function () {
+    var card = document.getElementById("lockCard");
+    var pill = document.getElementById("lcPill");
+    var meta = document.getElementById("lcMeta");
+    var timer = document.getElementById("lcTimer");
+    var foot = document.getElementById("lcFootText");
+    var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    function lockNow() {
+      card.classList.add("is-locked");
+      pill.textContent = "Verrouillé";
+      meta.textContent = "Épreuve en cours";
+      foot.textContent = "17 postes verrouillés";
+    }
+
+    if (reduceMotion) {
+      lockNow();
+      return;
+    }
+
+    var remaining = 3;
+    var tick = setInterval(function () {
+      remaining -= 1;
+      if (remaining <= 0) {
+        clearInterval(tick);
+        lockNow();
+        return;
+      }
+      timer.textContent = "00:0" + remaining;
+    }, 700);
+  })();
+</script>
 </body>
 </html>
