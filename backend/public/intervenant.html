@@ -4,35 +4,41 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Locked — Espace intervenant</title>
+<link rel="preconnect" href="https://fonts.bunny.net">
+<link href="https://fonts.bunny.net/css?family=fraunces:500,600,700|work-sans:400,500,600,700|ibm-plex-mono:500,600&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #f5f5f7;
-    --card: #ffffff;
-    --text: #1d1d1f;
-    --text-secondary: #6e6e73;
-    --border: rgba(0, 0, 0, 0.07);
-    --shadow: 0 2px 10px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.03);
-    --accent: #0071e3;
-    --accent-hover: #0077ed;
+    --bg: #f6f1e7;
+    --card: #fffdf8;
+    --text: #17142a;
+    --text-secondary: #55507a;
+    --border: #ddd3ba;
+    --shadow: 0 1px 2px rgba(23, 20, 38, 0.06), 0 8px 20px rgba(23, 20, 38, 0.07);
+    --accent: #3a2fae;
+    --accent-hover: #241c6b;
     --success: #1d8a3e;
     --success-bg: #eafaf0;
     --danger: #d70015;
     --danger-bg: #fdecec;
     --warning: #b25000;
     --warning-bg: #fff2e3;
-    --info: #0071e3;
-    --radius-lg: 20px;
-    --radius-sm: 10px;
+    --info: #3a2fae;
+    --info-bg: #ece9fb;
+    --focus: #e0982f;
+    --radius-lg: 10px;
+    --radius-sm: 6px;
     --radius-pill: 980px;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-family: "Work Sans", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     background: var(--bg);
     color: var(--text);
     -webkit-font-smoothing: antialiased;
   }
+  h2, h3, .brand { font-family: "Fraunces", Georgia, serif; }
+  .brand .dot { color: var(--focus); }
   .app { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
   a.back { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }
   a.back:hover { color: var(--text); }
@@ -102,7 +108,7 @@
 
   .room-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
   .room-code-block { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
-  .room-code { font-size: 1.6rem; font-weight: 700; letter-spacing: 0.08em; font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; }
+  .room-code { font-size: 1.6rem; font-weight: 700; letter-spacing: 0.08em; font-family: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace; }
   code.co-code { background: rgba(0,113,227,0.1); color: var(--accent); padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.85rem; }
   .lifecycle-badge { font-size: 0.75rem; font-weight: 600; padding: 0.25rem 0.7rem; border-radius: var(--radius-pill); }
   .lifecycle-badge.waiting { color: var(--warning); background: var(--warning-bg); }
@@ -153,18 +159,20 @@
   .event .time { color: var(--text-secondary); font-size: 0.78rem; }
   .type-focus_lost, .type-excluded, .type-entry_denied { color: var(--danger); background: var(--danger-bg); }
   .type-focus_returned, .type-joined, .type-submitted, .type-test_exit, .type-entry_approved, .type-environment_violation_cleared { color: var(--success); background: var(--success-bg); }
-  .type-screenshot, .type-entry_requested { color: var(--info); background: #e8f2fd; }
+  .type-screenshot, .type-entry_requested { color: var(--info); background: var(--info-bg); }
   .type-ai_flag, .type-disconnected, .type-environment_violation_detected { color: var(--warning); background: var(--warning-bg); }
   .status-line { font-size: 0.85rem; color: var(--danger); margin-top: 0.75rem; min-height: 1.2em; }
 
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #000000; --card: #1c1c1e; --text: #f5f5f7; --text-secondary: #9a9a9e;
-      --border: rgba(255, 255, 255, 0.09); --shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+      --bg: #121022; --card: #1a1730; --text: #f1ecdf; --text-secondary: #b6afd8;
+      --border: rgba(255, 255, 255, 0.14); --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 20px rgba(0, 0, 0, 0.4);
+      --accent: #a698f7; --accent-hover: #c1b6fa; --info: #a698f7; --info-bg: rgba(147, 132, 240, 0.18);
+      --focus: #eeb15c;
     }
-    input, select { background: #2c2c2e; color: var(--text); }
+    input, select { background: #241f3d; color: var(--text); }
     button.secondary { background: rgba(255, 255, 255, 0.08); color: var(--text); }
-    .shortcut, .student, .submission, .room-row { background: #2c2c2e; }
+    .shortcut, .student, .submission, .room-row { background: #241f3d; }
     nav.tabs { background: rgba(255,255,255,0.08); }
   }
 </style>
@@ -173,7 +181,10 @@
 <div class="app">
   <a class="back" href="index.html">← Accueil</a>
 
-  <section id="loginCard" class="card" style="margin-top: 1.25rem;">
+  <div class="brand" style="margin: 1.1rem 0 0.25rem;">Locked<span class="dot">.</span></div>
+  <p style="color: var(--text-secondary); font-size: 0.95rem; margin: 0 0 1.25rem;">Espace professionnel</p>
+
+  <section id="loginCard" class="card">
     <h2>Connexion</h2>
     <label for="emailBox">Email</label>
     <input id="emailBox" type="email" />
@@ -192,7 +203,7 @@
 
   <div id="mainSection" class="hidden">
     <div class="topbar">
-      <div class="brand">Locked</div>
+      <div class="brand">Locked<span class="dot">.</span></div>
       <nav class="tabs">
         <button data-view="accueil" class="active">Accueil</button>
         <button data-view="dashboard">Tableau de bord</button>

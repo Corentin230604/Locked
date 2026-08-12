@@ -4,101 +4,193 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Locked — Espace élève</title>
+<link rel="preconnect" href="https://fonts.bunny.net">
+<link href="https://fonts.bunny.net/css?family=fraunces:400,500,600,500i,700|work-sans:400,500,600,700|ibm-plex-mono:500,600&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #f5f5f7;
-    --card: #ffffff;
-    --text: #1d1d1f;
-    --text-secondary: #6e6e73;
-    --border: rgba(0, 0, 0, 0.07);
-    --shadow: 0 2px 10px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.03);
-    --accent: #0071e3;
-    --accent-hover: #0077ed;
-    --radius-lg: 20px;
-    --radius-pill: 980px;
+    --paper: #f6f1e7;
+    --paper-line: rgba(23, 20, 38, 0.07);
+    --ink: #17142a;
+    --ink-soft: #55507a;
+    --indigo: #4433c7;
+    --indigo-deep: #241c6b;
+    --indigo-on-paper: #3a2fae;
+    --focus: #e0982f;
+    --focus-ink: #6b430e;
+    --rule: #d8cfb8;
+    --card: #fffdf8;
+    --shadow-sm: 0 1px 2px rgba(23, 20, 38, 0.07);
+    --shadow-lg: 0 16px 40px rgba(23, 20, 38, 0.10);
+    --radius: 4px;
+    --content-max: 720px;
+    --rule-indent: 1.5rem;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #121022;
+      --paper-line: rgba(255, 255, 255, 0.055);
+      --ink: #f1ecdf;
+      --ink-soft: #b6afd8;
+      --indigo: #9384f5;
+      --indigo-deep: #0d0b1c;
+      --indigo-on-paper: #a698f7;
+      --focus: #eeb15c;
+      --focus-ink: #3a2503;
+      --rule: rgba(255, 255, 255, 0.16);
+      --card: #1a1730;
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+      --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.45);
+    }
   }
   * { box-sizing: border-box; }
   body {
     margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background: var(--bg);
-    color: var(--text);
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Work Sans", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
+    line-height: 1.55;
   }
-  .app { max-width: 640px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
-  a.back { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }
-  a.back:hover { color: var(--text); }
-  header.hero { text-align: center; margin: 1.5rem 0 2rem; }
-  header.hero h1 { font-size: 2.25rem; font-weight: 600; letter-spacing: -0.02em; margin: 0 0 0.25rem; }
-  header.hero p { color: var(--text-secondary); font-size: 1.05rem; margin: 0; }
+  a { color: var(--indigo-on-paper); }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--indigo-on-paper); outline-offset: 3px; }
+
+  h1, h2, h3 { font-family: "Fraunces", Georgia, serif; font-weight: 600; letter-spacing: -0.01em; text-wrap: balance; margin: 0; }
+
+  .app { max-width: var(--content-max); margin: 0 auto; padding: 2.25rem 1.5rem 4.5rem; }
+
+  a.back { color: var(--ink-soft); text-decoration: none; font-size: 0.88rem; font-weight: 500; }
+  a.back:hover { color: var(--ink); }
+
+  header.hero { margin: 2.25rem 0 2.75rem; }
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.72rem; font-weight: 500; letter-spacing: 0.09em; text-transform: uppercase;
+    color: var(--indigo-on-paper); margin: 0 0 0.75rem;
+  }
+  header.hero h1 { font-size: clamp(2rem, 5vw, 2.65rem); margin-bottom: 0.5rem; }
+  header.hero p.lede { color: var(--ink-soft); font-size: 1.05rem; margin: 0; max-width: 48ch; }
+
   .card {
     background: var(--card);
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow);
+    border-radius: var(--radius);
+    border: 1.5px solid var(--rule);
+    box-shadow: var(--shadow-sm);
     padding: 1.75rem;
     margin-bottom: 1.25rem;
   }
-  h2 { font-size: 1.1rem; font-weight: 600; margin: 0 0 0.85rem; letter-spacing: -0.01em; }
-  ol { margin: 0; padding-left: 1.25rem; }
-  ol li { margin-bottom: 0.6rem; line-height: 1.5; }
-  ol li:last-child { margin-bottom: 0; }
-  p.note { color: var(--text-secondary); font-size: 0.88rem; line-height: 1.5; }
-  .btn {
-    display: inline-block;
-    font-weight: 500;
-    text-decoration: none;
-    border-radius: var(--radius-pill);
-    padding: 0.7rem 1.6rem;
-    background: var(--accent);
-    color: white;
-  }
-  .btn:hover { background: var(--accent-hover); }
-  .btn.secondary { background: rgba(0, 0, 0, 0.06); color: var(--text); }
-  .btn.secondary:hover { background: rgba(0, 0, 0, 0.1); }
-  .download-buttons { display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; }
+  .card.notice { border-left: 3px solid var(--indigo); }
+  .card.warn { border-left: 3px solid var(--focus); }
 
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #000000;
-      --card: #1c1c1e;
-      --text: #f5f5f7;
-      --text-secondary: #9a9a9e;
-      --border: rgba(255, 255, 255, 0.09);
-      --shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
-    }
-    .btn.secondary { background: rgba(255, 255, 255, 0.1); color: var(--text); }
-    .btn.secondary:hover { background: rgba(255, 255, 255, 0.16); }
+  h2 { font-size: 1.15rem; margin: 0 0 1rem; }
+
+  ol.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 1.1rem; }
+  ol.steps li {
+    display: grid; grid-template-columns: 1.9rem 1fr; gap: 0.9rem;
+    padding-left: var(--rule-indent); border-left: 1.5px solid var(--rule); position: relative;
   }
+  ol.steps li::before {
+    content: ""; position: absolute; left: -4.5px; top: 0.4rem;
+    width: 7px; height: 7px; border-radius: 50%; background: var(--focus);
+  }
+  ol.steps .num { font-family: "IBM Plex Mono", ui-monospace, monospace; font-weight: 600; font-size: 0.9rem; color: var(--indigo-on-paper); }
+  ol.steps p { margin: 0; line-height: 1.55; }
+
+  p.note { color: var(--ink-soft); font-size: 0.9rem; line-height: 1.55; margin: 0; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    font-weight: 600; font-size: 0.95rem; text-decoration: none;
+    border-radius: var(--radius); padding: 0.8rem 1.5rem;
+    background: var(--ink); color: var(--paper);
+    border: 1.5px solid transparent;
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+  .btn:hover { background: var(--indigo-deep); }
+  .btn:active { transform: translateY(1px); }
+  @media (prefers-color-scheme: dark) {
+    .btn { background: var(--focus); color: #241503; }
+    .btn:hover { background: #f3c07a; }
+  }
+  .btn.secondary { background: transparent; color: var(--ink); border-color: var(--ink); }
+  .btn.secondary:hover { border-color: var(--indigo-on-paper); color: var(--indigo-on-paper); background: transparent; }
+  .download-buttons { display: flex; gap: 0.85rem; flex-wrap: wrap; }
+
+  code.cmd {
+    display: block;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.88rem;
+    background: var(--ink);
+    color: var(--paper);
+    padding: 0.85rem 1.1rem;
+    border-radius: var(--radius);
+    margin: 0.6rem 0;
+    overflow-x: auto;
+    white-space: pre;
+  }
+  @media (prefers-color-scheme: dark) {
+    code.cmd { background: #0d0b1c; }
+  }
+
+  details.gatekeeper { margin-top: 1rem; }
+  details.gatekeeper summary {
+    cursor: pointer; font-weight: 600; font-size: 0.92rem; color: var(--indigo-on-paper);
+    list-style: none;
+  }
+  details.gatekeeper summary::-webkit-details-marker { display: none; }
+  details.gatekeeper summary::before { content: "▸ "; }
+  details.gatekeeper[open] summary::before { content: "▾ "; }
+  details.gatekeeper .content { margin-top: 0.9rem; }
+  details.gatekeeper ol { margin: 0.5rem 0 0; padding-left: 1.25rem; }
+  details.gatekeeper li { margin-bottom: 0.5rem; font-size: 0.92rem; color: var(--ink-soft); }
 </style>
 </head>
 <body>
 <div class="app">
   <a class="back" href="index.html">← Accueil</a>
+
   <header class="hero">
-    <h1>Locked</h1>
-    <p>Espace élève</p>
+    <p class="eyebrow">Espace élève</p>
+    <h1>Rejoindre un examen surveillé</h1>
+    <p class="lede">
+      Locked verrouille votre poste en plein écran pendant l'épreuve — ce n'est possible
+      qu'avec l'application installée, pas depuis un navigateur.
+    </p>
   </header>
 
-  <div class="card">
+  <div class="card notice">
     <h2>Ce n'est pas une page web</h2>
     <p class="note">
       Pendant l'examen, Locked verrouille votre Excel en plein écran et bloque les
-      raccourcis permettant de sortir de l'application — ce n'est possible qu'avec
-      une application installée sur votre PC (Windows ou Mac), pas depuis un navigateur.
+      raccourcis permettant de sortir de l'application. Cela ne fonctionne qu'avec
+      une application installée sur votre PC (Windows ou Mac).
     </p>
   </div>
 
   <div class="card">
     <h2>Comment rejoindre un examen</h2>
-    <ol>
-      <li>Téléchargez et installez l'application Locked (Windows ou Mac) ci-dessous.</li>
-      <li>Lancez l'application et saisissez le code de room communiqué par votre intervenant.</li>
-      <li>Vous entrez dans une file d'attente : Excel s'ouvre en arrière-plan, non verrouillé.</li>
-      <li>Dès que l'intervenant démarre l'examen, Excel passe en plein écran et la surveillance s'active automatiquement — pour tout le monde en même temps.</li>
-      <li>À la fin de l'examen, votre copie est enregistrée et envoyée automatiquement.</li>
+    <ol class="steps">
+      <li>
+        <span class="num">01</span>
+        <p>Téléchargez et installez l'application Locked (Windows ou Mac) ci-dessous.</p>
+      </li>
+      <li>
+        <span class="num">02</span>
+        <p>Lancez l'application et saisissez le code de room communiqué par votre intervenant.</p>
+      </li>
+      <li>
+        <span class="num">03</span>
+        <p>Vous entrez dans une file d'attente : Excel s'ouvre en arrière-plan, non verrouillé.</p>
+      </li>
+      <li>
+        <span class="num">04</span>
+        <p>Dès que l'intervenant démarre l'examen, Excel passe en plein écran et la surveillance s'active automatiquement — pour tout le monde en même temps.</p>
+      </li>
+      <li>
+        <span class="num">05</span>
+        <p>À la fin de l'examen, votre copie est enregistrée et envoyée automatiquement.</p>
+      </li>
     </ol>
-    <p class="note" style="margin-top: 1rem;">
+    <p class="note" style="margin-top: 1.25rem;">
       Sur Mac, l'application vous demandera d'autoriser l'accès à l'Accessibilité, à l'enregistrement
       d'écran et le pilotage d'Excel au premier lancement — acceptez ces demandes, elles sont
       nécessaires au bon fonctionnement de la surveillance.
@@ -107,13 +199,35 @@
 
   <div class="card" style="text-align: center;">
     <h2>Télécharger l'application</h2>
-    <p class="note" style="margin-bottom: 1rem;">
+    <p class="note" style="margin-bottom: 1.25rem;">
       Si aucune version n'est encore publiée, demandez le lien d'installation à votre intervenant.
     </p>
-    <div class="download-buttons">
+    <div class="download-buttons" style="justify-content: center;">
       <a class="btn" href="https://github.com/corentin230604/locked/releases/download/agent-latest/LockedAgent.exe">Télécharger pour Windows</a>
       <a class="btn secondary" href="https://github.com/corentin230604/locked/releases/download/agent-mac-latest/LockedAgentMac.zip">Télécharger pour Mac</a>
     </div>
+  </div>
+
+  <div class="card warn">
+    <h2>Sur Mac : « l'app est endommagée » ?</h2>
+    <p class="note">
+      C'est normal — l'application n'est pas encore signée par un compte développeur Apple, donc
+      macOS refuse de l'ouvrir directement après le téléchargement. Ce n'est pas un vrai problème
+      de fichier corrompu.
+    </p>
+    <details class="gatekeeper">
+      <summary>Voir comment débloquer l'ouverture</summary>
+      <div class="content">
+        <ol>
+          <li>Ouvrez l'application <strong>Terminal</strong> (Cmd + Espace, tapez « Terminal »).</li>
+          <li>Collez la commande suivante, en adaptant le chemin si besoin, puis appuyez sur Entrée :</li>
+        </ol>
+        <code class="cmd">xattr -cr ~/Downloads/LockedAgentMac.app</code>
+        <ol start="3">
+          <li>Retournez dans le Finder et double-cliquez sur l'application — elle s'ouvre normalement.</li>
+        </ol>
+      </div>
+    </details>
   </div>
 </div>
 </body>
