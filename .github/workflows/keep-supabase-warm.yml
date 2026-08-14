@@ -1,0 +1,30 @@
+name: Keep Supabase Warm
+
+# Supabase's free tier auto-pauses a project after roughly a week with no
+# API activity — this is what caused login to fail with a generic "Load
+# failed" network error. A small read every few days keeps the project
+# active without needing to upgrade to a paid plan. Runs independently of
+# Render (which spins down on its own free-tier idle timer, so a ping from
+# inside that process wouldn't fire reliably).
+on:
+  schedule:
+    - cron: "0 6 */3 * *" # every 3 days at 06:00 UTC — well under the ~7 day pause threshold
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST API
+        run: |
+          # Anon key — safe to commit, protected by RLS, same key already
+          # embedded in every dashboard/agent in this repo. A harmless
+          # read (1 row, id only) against a table anon is allowed to read.
+          STATUS=$(curl -sS -o /dev/null -w "%{http_code}" \
+            "https://kacjqpqppcqtdyebdpyi.supabase.co/rest/v1/rooms?select=id&limit=1" \
+            -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImthY2pxcHFwcGNxdGR5ZWJkcHlpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyMDQzNzAsImV4cCI6MjA5OTc4MDM3MH0.IoOLViEXo8JAHgF3QVlLiWDrIyUAq5_kGBisZjG8RpI" \
+            -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImthY2pxcHFwcGNxdGR5ZWJkcHlpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyMDQzNzAsImV4cCI6MjA5OTc4MDM3MH0.IoOLViEXo8JAHgF3QVlLiWDrIyUAq5_kGBisZjG8RpI")
+          echo "Supabase REST API responded with HTTP $STATUS"
+          if [ "$STATUS" -ge 500 ] || [ "$STATUS" -eq 000 ]; then
+            echo "::warning::Supabase may be unreachable or paused (status $STATUS) — check the dashboard."
+          fi
