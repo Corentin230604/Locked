@@ -33,8 +33,13 @@
                 <PasswordBox x:Name="PasswordBox" Style="{StaticResource RoundedPasswordBox}" Margin="0,0,0,14"/>
 
                 <StackPanel x:Name="RegisterFields" Visibility="Collapsed">
-                    <TextBlock Text="Nom complet" Style="{StaticResource FieldLabel}"/>
-                    <TextBox x:Name="FullNameBox" Style="{StaticResource RoundedTextBox}" Margin="0,0,0,14"/>
+                    <TextBlock Text="Nom" Style="{StaticResource FieldLabel}"/>
+                    <TextBox x:Name="LastNameBox" Style="{StaticResource RoundedTextBox}"
+                             Margin="0,0,0,14" CharacterCasing="Upper"/>
+
+                    <TextBlock Text="Prénom" Style="{StaticResource FieldLabel}"/>
+                    <TextBox x:Name="FirstNameBox" Style="{StaticResource RoundedTextBox}"
+                             Margin="0,0,0,14" TextChanged="FirstNameBox_TextChanged"/>
 
                     <TextBlock Text="Code classe" Style="{StaticResource FieldLabel}"/>
                     <TextBox x:Name="ClassCodeBox" Style="{StaticResource RoundedTextBox}"

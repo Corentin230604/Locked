@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Windows;
+using System.Windows.Controls;
 
 namespace LockedAgent;
 
@@ -24,6 +25,27 @@ public partial class JoinWindow : Window
     public JoinWindow()
     {
         InitializeComponent();
+    }
+
+    private bool _formattingFirstName;
+
+    /// <summary>Première lettre en majuscule, le reste en minuscule, au fil
+    /// de la saisie - CharacterCasing (utilisé pour Nom/Code classe) ne
+    /// permet pas ce mélange, d'où ce handler manuel.</summary>
+    private void FirstNameBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_formattingFirstName) return;
+        var text = FirstNameBox.Text;
+        if (string.IsNullOrEmpty(text)) return;
+
+        var formatted = char.ToUpperInvariant(text[0]) + text[1..].ToLowerInvariant();
+        if (formatted == text) return;
+
+        var caret = FirstNameBox.CaretIndex;
+        _formattingFirstName = true;
+        FirstNameBox.Text = formatted;
+        FirstNameBox.CaretIndex = Math.Min(caret, formatted.Length);
+        _formattingFirstName = false;
     }
 
     private void ToggleModeButton_Click(object sender, RoutedEventArgs e)
@@ -56,13 +78,15 @@ public partial class JoinWindow : Window
             // attached below) for the whole session's polling/uploads.
             var http = new HttpClient();
 
-            var fullName = FullNameBox.Text.Trim();
+            var lastName = LastNameBox.Text.Trim();
+            var firstName = FirstNameBox.Text.Trim();
+            var fullName = $"{firstName} {lastName}".Trim();
             if (_registerMode)
             {
                 var classCode = ClassCodeBox.Text.Trim().ToUpperInvariant();
-                if (string.IsNullOrWhiteSpace(fullName) || string.IsNullOrWhiteSpace(classCode))
+                if (string.IsNullOrWhiteSpace(lastName) || string.IsNullOrWhiteSpace(firstName) || string.IsNullOrWhiteSpace(classCode))
                 {
-                    StatusText.Text = "Merci de renseigner votre nom complet et le code de votre classe.";
+                    StatusText.Text = "Merci de renseigner votre nom, votre prénom et le code de votre classe.";
                     return;
                 }
 

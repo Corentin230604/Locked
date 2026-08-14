@@ -1,23 +1,26 @@
 import Cocoa
 
-final class JoinWindowController: NSWindowController {
+final class JoinWindowController: NSWindowController, NSTextFieldDelegate {
     private let baseUrlField = NSTextField(string: "https://locked-j4y8.onrender.com")
     private let emailField = NSTextField()
     private let passwordField = NSSecureTextField()
-    private let fullNameField = NSTextField()
+    private let lastNameField = NSTextField()
+    private let firstNameField = NSTextField()
     private let classCodeField = NSTextField()
-    private let fullNameLabel = NSTextField(labelWithString: "Nom complet")
+    private let lastNameLabel = NSTextField(labelWithString: "Nom")
+    private let firstNameLabel = NSTextField(labelWithString: "Prénom")
     private let classCodeLabel = NSTextField(labelWithString: "Code classe")
     private let statusLabel = NSTextField(wrappingLabelWithString: "")
     private let continueButton = NSButton(title: "Continuer", target: nil, action: nil)
     private let toggleButton = NSButton(title: "Nouveau sur Locked ? Créer un compte", target: nil, action: nil)
 
     private var registerMode = false
+    private var formattingField = false
     private var dashboardController: StudentDashboardWindowController?
 
     convenience init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 380, height: 460),
+            contentRect: NSRect(x: 0, y: 0, width: 380, height: 500),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -46,10 +49,15 @@ final class JoinWindowController: NSWindowController {
         subtitleLabel.font = .systemFont(ofSize: 12)
         subtitleLabel.textColor = .secondaryLabelColor
 
-        fullNameLabel.isHidden = true
-        fullNameField.isHidden = true
+        lastNameLabel.isHidden = true
+        lastNameField.isHidden = true
+        firstNameLabel.isHidden = true
+        firstNameField.isHidden = true
         classCodeLabel.isHidden = true
         classCodeField.isHidden = true
+
+        lastNameField.delegate = self
+        firstNameField.delegate = self
 
         statusLabel.textColor = .systemRed
         statusLabel.font = .systemFont(ofSize: 11)
@@ -69,7 +77,8 @@ final class JoinWindowController: NSWindowController {
             fieldLabel("Adresse du serveur"), baseUrlField,
             fieldLabel("Email"), emailField,
             fieldLabel("Mot de passe"), passwordField,
-            fullNameLabel, fullNameField,
+            lastNameLabel, lastNameField,
+            firstNameLabel, firstNameField,
             classCodeLabel, classCodeField,
             continueButton, toggleButton, statusLabel,
         ])
@@ -85,7 +94,7 @@ final class JoinWindowController: NSWindowController {
             stack.topAnchor.constraint(equalTo: content.topAnchor, constant: 24),
         ])
 
-        for field in [baseUrlField, emailField, passwordField, fullNameField, classCodeField] {
+        for field in [baseUrlField, emailField, passwordField, lastNameField, firstNameField, classCodeField] {
             field.translatesAutoresizingMaskIntoConstraints = false
             field.widthAnchor.constraint(equalToConstant: 320).isActive = true
         }
@@ -95,11 +104,42 @@ final class JoinWindowController: NSWindowController {
 
     @objc private func toggleModeTapped() {
         registerMode.toggle()
-        fullNameLabel.isHidden = !registerMode
-        fullNameField.isHidden = !registerMode
+        lastNameLabel.isHidden = !registerMode
+        lastNameField.isHidden = !registerMode
+        firstNameLabel.isHidden = !registerMode
+        firstNameField.isHidden = !registerMode
         classCodeLabel.isHidden = !registerMode
         classCodeField.isHidden = !registerMode
         toggleButton.title = registerMode ? "Déjà un compte ? Se connecter" : "Nouveau sur Locked ? Créer un compte"
+    }
+
+    /// Nom -> majuscules, Prénom -> première lettre en majuscule et le
+    /// reste en minuscule, au fil de la saisie. Edits the live field editor
+    /// (not just `stringValue`) so the visible text and the caret position
+    /// stay in sync while typing.
+    func controlTextDidChange(_ obj: Notification) {
+        guard !formattingField,
+            let field = obj.object as? NSTextField,
+            let editor = field.currentEditor()
+        else { return }
+
+        let text = editor.string
+        let formatted: String
+        if field === lastNameField {
+            formatted = text.uppercased()
+        } else if field === firstNameField {
+            guard let first = text.first else { return }
+            formatted = String(first).uppercased() + text.dropFirst().lowercased()
+        } else {
+            return
+        }
+        guard formatted != text else { return }
+
+        let range = editor.selectedRange
+        formattingField = true
+        editor.string = formatted
+        editor.selectedRange = NSRange(location: min(range.location, formatted.count), length: 0)
+        formattingField = false
     }
 
     @objc private func continueTapped() {
@@ -120,10 +160,12 @@ final class JoinWindowController: NSWindowController {
             defer { continueButton.isEnabled = true }
 
             if registerMode {
-                let fullName = fullNameField.stringValue.trimmingCharacters(in: .whitespaces)
+                let lastName = lastNameField.stringValue.trimmingCharacters(in: .whitespaces)
+                let firstName = firstNameField.stringValue.trimmingCharacters(in: .whitespaces)
+                let fullName = "\(firstName) \(lastName)".trimmingCharacters(in: .whitespaces)
                 let classCode = classCodeField.stringValue.trimmingCharacters(in: .whitespaces).uppercased()
-                guard !fullName.isEmpty, !classCode.isEmpty else {
-                    statusLabel.stringValue = "Merci de renseigner votre nom complet et le code de votre classe."
+                guard !lastName.isEmpty, !firstName.isEmpty, !classCode.isEmpty else {
+                    statusLabel.stringValue = "Merci de renseigner votre nom, votre prénom et le code de votre classe."
                     return
                 }
 
